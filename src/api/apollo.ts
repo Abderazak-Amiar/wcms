@@ -1,0 +1,16 @@
+import { ApolloClient, gql, InMemoryCache } from '@apollo/client';
+
+export const client = new ApolloClient({
+  uri: 'http://localhost:4000/graphql',
+  cache: new InMemoryCache(),
+});
+
+
+
+export const getUser = gql`query ($userName: String!, $password: String!) {
+  user(userName: $userName, password: $password) {
+    userID
+  }
+}
+`;
+
