@@ -1,35 +1,71 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/electron-vite.animate.svg'
-import './App.css'
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { Route, Routes } from 'react-router-dom';
+import './App.css';
+import Home from './components/pages/Home';
+import Login from './components/pages/Login';
+import Protected from './components/pages/Protected';
+import isAuthenticated from './helpers';
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      light: '#42a5f5',
+      main: '#1976d2',
+      dark: '#1565c0',
+      contrastText: '#fff',
+    },
+    secondary: {
+      light: '#ba68c8',
+      main: '#9c27b0',
+      dark: '#7b1fa2',
+      contrastText: '#000',
+    },
+    error: {
+      light: '#ef5350',
+      main: '#d32f2f',
+      dark: '#c62828',
+      contrastText: '#fff',
+    },
+    warning: {
+      light: '#ff9800',
+      main: '#ed6c02',
+      dark: '#e65100',
+      contrastText: '#fff',
+    },
+    info: {
+      light: '#03a9f4',
+      main: '#0288d1',
+      dark: '#01579b',
+      contrastText: '#fff',
+    },
+    success: {
+      light: '#4caf50',
+      main: '#2e7d32',
+      dark: '#1b5e20',
+      contrastText: '#fff',
+    },
+    grey: {
+      A100: '#f5f5f5',
+      A200: '#eeeeee',
+      A400: '#A400',
+      A700: '#A700',
+    },
+  },
+});
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://electron-vite.github.io" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <ThemeProvider theme={theme}>
+      <Routes>
+        <Route path="/" element={<Login />} loader={async () => await isAuthenticated()}
+        />
+        <Route element={<Protected />}>
+          <Route path="/home" element={<Home />} />
+        </Route>
+        <Route path="*" element={<h1>Page not found</h1>} />
+      </Routes>
+    </ThemeProvider>
+  );
 }
 
-export default App
+export default App;
