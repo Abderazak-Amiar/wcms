@@ -22,8 +22,22 @@ function Home() {
     <PaidIcon />,
     <PointOfSaleIcon />,
   ];
-  const menuFr = ['Consomateur', 'Compteur', 'Facture', 'Paiement', 'Dette','Paramètres'];
-  const menu = ['consumer', 'counter', 'invoice', 'payment', 'debt','settings'];
+  const menuFr = [
+    'Consomateur',
+    'Compteur',
+    'Facture',
+    'Paiement',
+    'Dette',
+    'Paramètres',
+  ];
+  const menu = [
+    'consumer',
+    'counter',
+    'invoice',
+    'payment',
+    'debt',
+    'settings',
+  ];
   const theme = useTheme();
   return (
     <Grid container>
@@ -31,6 +45,7 @@ function Home() {
         <Paper sx={{ height: '100vh' }}>
           {menuFr.map((item, index) => (
             <Link
+              key={menu[index]}
               to={menu[index]}
               style={{
                 textDecoration: 'none',

@@ -5,12 +5,19 @@ export const client = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
-
-
-export const getUser = gql`query ($userName: String!, $password: String!) {
-  user(userName: $userName, password: $password) {
-    userID
+export const getUser = gql`
+  query ($userName: String!, $password: String!) {
+    userLogin(userName: $userName, password: $password) {
+      userID
+      userName
+    }
   }
-}
 `;
 
+export const addConsumer = gql`
+  mutation ($fullName: String!) {
+    userLogin(fullName: $fullName) {
+      fullName
+    }
+  }
+`;

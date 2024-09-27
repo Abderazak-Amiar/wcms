@@ -32,7 +32,9 @@ function LoginForm() {
   const formik = useFormik({
     initialValues: initialValues,
     validationSchema: validationSchema,
-    onSubmit: (values: userLoginType) => {},
+    onSubmit: (values: userLoginType) => {
+      console.log('==>values', values);
+    },
   });
 
   useEffect(() => {
@@ -40,10 +42,16 @@ function LoginForm() {
   }, [formik.values]);
 
   const [submit, { loading, error, data }] = useLazyQuery(getUser);
-  console.log('==>data', data?.user);
+  if (loading) {
+    console.log('==>loading', loading);
+  }
+  if (error) {
+    console.log('==>error', error);
+  }
+  console.log('==>data', data?.userLogin);
   useEffect(() => {
-    if (data?.user) {
-      localStorage.setItem('token', data.user.userID);
+    if (data?.userLogin) {
+      localStorage.setItem('token', data.userLogin.userID);
       navigate('/home');
     }
   }, [data, navigate]);

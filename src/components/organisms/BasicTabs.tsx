@@ -43,7 +43,6 @@ export default function BasicTabs(props: basicTabsPropTypes) {
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
-
   return (
     <Box sx={{ width: '100%' }}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -53,12 +52,16 @@ export default function BasicTabs(props: basicTabsPropTypes) {
           aria-label="basic tabs example"
         >
           {labels.map((label: string, index: number) => (
-            <Tab label={label} {...a11yProps(index)} />
+            <Tab
+              key={label + 'menu-item'}
+              label={label}
+              {...a11yProps(index)}
+            />
           ))}
         </Tabs>
       </Box>
       {labels.map((label: string, index: number) => (
-        <CustomTabPanel value={value} index={index}>
+        <CustomTabPanel key={label + 'comp'} value={value} index={index}>
           {components[index]}
         </CustomTabPanel>
       ))}
