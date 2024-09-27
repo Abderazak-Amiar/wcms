@@ -1,0 +1,34 @@
+#root,
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+.login-page {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: url('taourirt.jpg');
+  background-size: cover;
+}
+.login-form {
+  width: 600px;
+  height: 500px;
+  background-color: white;
+  padding: 64px;
+  border-radius: 16px;
+  border: solid 3px #ccc;
+  text-align: center;
+}
+
+.login-form-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: transparent;
+}
+.water-icon {
+  width: 50px !important;
+  height: auto;
+}
