@@ -1,9 +1,17 @@
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { Route, Routes } from 'react-router-dom';
 import './App.css';
+import AddConsumer from './components/pages/consumer/addConsumer';
+import Consumer from './components/pages/consumer/Consumer';
+import ConsumerList from './components/pages/consumer/ConsumerList';
+import Counter from './components/pages/Counter';
+import Debt from './components/pages/Debt';
 import Home from './components/pages/Home';
+import Invoice from './components/pages/Invoice';
 import Login from './components/pages/Login';
+import Payment from './components/pages/Payment';
 import Protected from './components/pages/Protected';
+import Settings from './components/pages/Settings';
 import isAuthenticated from './helpers';
 
 const theme = createTheme({
@@ -57,10 +65,23 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <Routes>
-        <Route path="/" element={<Login />} loader={async () => await isAuthenticated()}
+        <Route
+          path="/"
+          element={<Login />}
+          loader={async () => await isAuthenticated()}
         />
         <Route element={<Protected />}>
-          <Route path="/home" element={<Home />} />
+          <Route path="/home" element={<Home />}>
+            <Route path="consumer" element={<Consumer />}>
+              <Route path="add" element={<AddConsumer />} />
+              <Route path="list" element={<ConsumerList />} />
+            </Route>
+            <Route path="counter" element={<Counter />} />
+            <Route path="invoice" element={<Invoice />} />
+            <Route path="payment" element={<Payment />} />
+            <Route path="debt" element={<Debt />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
         </Route>
         <Route path="*" element={<h1>Page not found</h1>} />
       </Routes>
