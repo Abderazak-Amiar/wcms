@@ -1,0 +1,24 @@
+{
+  "name": "@wcms/api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "dependencies": {
+    "@apollo/server": "^4.11.0",
+    "graphql": "^16.9.0",
+    "sqlite3": "^5.1.7",
+    "uuid": "^10.0.0"
+  },
+  "graphql": {
+    "schema": "https://localhost:4000/graphql",
+    "documents": "**/*.{graphql,js,ts,jsx,tsx}"
+  }
+}
