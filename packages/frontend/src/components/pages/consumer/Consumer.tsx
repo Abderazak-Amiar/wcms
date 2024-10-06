@@ -1,7 +1,8 @@
 import { Box } from '@mui/material';
 import BasicTabs from '../../organisms/BasicTabs';
-import AddConsumer from './addConsumer';
 import ConsumerList from './ConsumerList';
+import AddConsumer from './AddConsumer';
+
 
 function Consumers() {
   return (

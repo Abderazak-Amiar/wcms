@@ -1,5 +1,5 @@
+import { v1 as uuidv1 } from 'uuid';
 import { db } from './db.js';
-
 export const typeDefs = `#graphql
 type User {
     userID: ID!
@@ -11,8 +11,7 @@ type User {
 }
 
 type Counter {
-    id:ID!
-    counterID: String!
+    counterID: ID!
     status: String!
     price: Int!
     createdAt: String!
@@ -22,7 +21,6 @@ type Counter {
     }
 
 type Consumer{
-    id:ID!
     consumerID: String!
     fullName: String!
     createdAt: String!
@@ -89,7 +87,7 @@ type Query {
 }
 
 type Mutation {
-    addConsumer(consumer: addConsumerInput!):Consumer
+    addConsumer(fullName: String!):Consumer!
     updateConsumer(id: String, edits:updateConsumerInput):Consumer
     deleteConsumer(id:String!):[Consumer!]
 }
@@ -191,18 +189,38 @@ export const resolvers = {
   },
   Mutation: {
     addConsumer(_, args) {
-      console.log('==>args', args);
       let newConsumer = {
-        consumerID: Math.floor(Math.random() * 1000).toString(),
+        consumerID: uuidv1(),
         createdAt: Date.now(),
         userID: '1',
-        ...args.consumer,
+        fullName: args.fullName,
       };
       console.log('==>newConsumer', newConsumer);
-      db.serialize(() => {
-        db.run(
-          `INSERT INTO consumer (consumerID, fullName, createdAt, userID) VALUES('${newConsumer.consumerID}', '${newConsumer.fullName}', '${newConsumer.createdAt}','${newConsumer.userID}')`,
-        );
+      console.log('==>uuidv1()', uuidv1());
+      console.log('==>uuidv1()', typeof uuidv1());
+      return new Promise((resolve, reject) => {
+        db.serialize(function () {
+          db.all(
+            `INSERT INTO consumer (consumerID,fullName, createdAt, userID) VALUES(?,?,?,?) RETURNING consumerID`,
+            [
+              newConsumer.consumerID,
+              newConsumer.fullName,
+              newConsumer.createdAt,
+              newConsumer.userID,
+            ],
+
+            async function (err, res) {
+              if (err) {
+                console.error(err.message);
+                reject(err);
+              }
+              console.log('==>res', res);
+              console.log('==>err', err);
+              const consumerID = res[0].consumerID;
+              resolve({ consumerID: consumerID });
+            },
+          );
+        });
       });
     },
   },

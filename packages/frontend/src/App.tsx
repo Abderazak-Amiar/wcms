@@ -1,7 +1,7 @@
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { Route, Routes } from 'react-router-dom';
 import './App.css';
-import AddConsumer from './components/pages/consumer/addConsumer';
+import AddConsumer from './components/pages/consumer/AddConsumer';
 import Consumer from './components/pages/consumer/Consumer';
 import ConsumerList from './components/pages/consumer/ConsumerList';
 import Counter from './components/pages/Counter';
