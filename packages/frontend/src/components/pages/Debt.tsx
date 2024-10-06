@@ -1,9 +1,5 @@
-import React from 'react'
-
 function Debt() {
-  return (
-    <div>Debt</div>
-  )
+  return <div>Debt</div>;
 }
 
-export default Debt
+export default Debt;
