@@ -1,4 +1,4 @@
-import { v1 as uuidv1 } from 'uuid';
+import { v4 as uuid } from 'uuid';
 import { db } from './db.js';
 export const typeDefs = `#graphql
 type User {
@@ -89,7 +89,7 @@ type Query {
 type Mutation {
     addConsumer(fullName: String!):Consumer!
     updateConsumer(id: String, edits:updateConsumerInput):Consumer
-    deleteConsumer(id:String!):[Consumer!]
+    deleteConsumers(consumerIDs: [String!]!): [Consumer]
 }
 input addConsumerInput {
     fullName: String!
@@ -109,12 +109,11 @@ export const resolvers = {
           db.all(`SELECT * FROM user`, (err, row) => {
             if (err) {
               console.error(err.message);
-              reject({});
+              reject();
             }
             resolve(row);
           });
         });
-        db.close();
       });
     },
     consumers: () => {
@@ -124,13 +123,12 @@ export const resolvers = {
             console.log('==>row', row);
             if (err) {
               console.error(err.message);
-              reject({});
+              reject();
             }
             resolve(row);
             console.log('==> resolve(row)', resolve(row));
           });
         });
-        db.close();
       });
     },
     user: (parent, args) => {
@@ -141,13 +139,12 @@ export const resolvers = {
             (err, row) => {
               if (err) {
                 console.error(err.message);
-                reject({});
+                reject();
               }
               resolve(row);
             },
           );
         });
-        db.close();
       });
     },
     userLogin: (parent, args) => {
@@ -158,13 +155,12 @@ export const resolvers = {
             (err, row) => {
               if (err) {
                 console.error(err.message);
-                reject({});
+                reject();
               }
               resolve(row);
             },
           );
         });
-        db.close();
       });
     },
 
@@ -183,46 +179,136 @@ export const resolvers = {
             },
           );
         });
-        db.close();
       });
     },
   },
   Mutation: {
     addConsumer(_, args) {
       let newConsumer = {
-        consumerID: uuidv1(),
+        consumerID: uuid(), // Manually generated ID
         createdAt: Date.now(),
-        userID: '1',
+        userID: '1', // Assuming a fixed userID for this example
         fullName: args.fullName,
       };
-      console.log('==>newConsumer', newConsumer);
-      console.log('==>uuidv1()', uuidv1());
-      console.log('==>uuidv1()', typeof uuidv1());
+
       return new Promise((resolve, reject) => {
         db.serialize(function () {
-          db.all(
-            `INSERT INTO consumer (consumerID,fullName, createdAt, userID) VALUES(?,?,?,?) RETURNING consumerID`,
+          db.run(
+            `INSERT INTO consumer (consumerID, fullName, createdAt, userID) VALUES (?, ?, ?, ?)`,
             [
               newConsumer.consumerID,
               newConsumer.fullName,
               newConsumer.createdAt,
               newConsumer.userID,
             ],
-
-            async function (err, res) {
+            function (err) {
               if (err) {
                 console.error(err.message);
                 reject(err);
+              } else if (this.changes === 0) {
+                // No rows were inserted
+                reject(new Error('Row insertion failed.'));
+              } else {
+                // Row was inserted successfully
+                resolve({ consumerID: newConsumer.consumerID });
               }
-              console.log('==>res', res);
-              console.log('==>err', err);
-              const consumerID = res[0].consumerID;
-              resolve({ consumerID: consumerID });
             },
           );
         });
       });
     },
+    updateConsumer(_, args) {
+      const { consumerID, fullName, email, address } = args;
+      return new Promise((resolve, reject) => {
+        db.serialize(function () {
+          const query = `UPDATE consumer SET fullName = ?, email = ?, address = ? WHERE consumerID = ?`;
+          db.run(query, [fullName, email, address, consumerID], function (err) {
+            if (err) {
+              console.error(err.message);
+              reject(err);
+            } else if (this.changes === 0) {
+              reject(new Error('Consumer not found with the provided ID.'));
+            } else {
+              resolve({
+                consumerID,
+                message: `Consumer with ID ${consumerID} updated successfully.`,
+              });
+            }
+          });
+        });
+      });
+    },
+    deleteConsumers(_, { consumerIDs }) {
+      return new Promise((resolve, reject) => {
+        db.serialize(() => {
+          const placeholders = consumerIDs.map(() => '?').join(', ');
+          db.all(
+            `SELECT * FROM consumer WHERE consumerID IN (${placeholders})`,
+            consumerIDs,
+            (err, rows) => {
+              if (err) {
+                console.error(err.message);
+                reject(err);
+                return;
+              }
+              if (!rows.length) {
+                reject(new Error('No consumers found with the provided IDs.'));
+                return;
+              }
+              db.run(
+                `DELETE FROM consumer WHERE consumerID IN (${placeholders})`,
+                consumerIDs,
+                (err) => {
+                  if (err) {
+                    console.error(err.message);
+                    reject(err);
+                  } else {
+                    console.log('==>rows', rows);
+                    resolve(rows); // Return the deleted consumers' data
+                  
+                  }
+                },
+              );
+            },
+          );
+        });
+      });
+    },
+
+    // deleteConsumers(_, { consumerIDs }) {
+    //   return new Promise((resolve, reject) => {
+    //     db.serialize(() => {
+    //       const placeholders = consumerIDs.map(() => '?').join(', ');
+    //       console.log('==>placeholders', placeholders);
+    //       db.run(
+    //         `DELETE FROM consumer WHERE consumerID IN (${placeholders})`,
+    //         consumerIDs,
+    //         function (err) {
+    //           if (err) {
+    //             console.error(err.message);
+    //             reject(err);
+    //           } else if (this.changes === 0) {
+    //             reject(new Error('No consumers found with the provided IDs.'));
+    //           } else {
+    //             // Fetch deleted consumers to return them
+    //             db.all(
+    //               `SELECT * FROM consumer WHERE consumerID IN (${placeholders})`,
+    //               consumerIDs,
+    //               (err, rows) => {
+    //                 if (err) {
+    //                   console.error(err.message);
+    //                   reject(err);
+    //                 } else {
+    //                   resolve(rows); // Return the deleted consumers' data
+    //                 }
+    //               },
+    //             );
+    //           }
+    //         },
+    //       );
+    //     });
+    //   });
+    // },
   },
 };
 // updateConsumer(_, args) {

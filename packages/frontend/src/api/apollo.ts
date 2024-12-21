@@ -12,11 +12,27 @@ export const getUser = gql`
     }
   }
 `;
+export const getConsumers = gql`
+  query {
+    consumers {
+      consumerID
+      fullName
+    }
+  }
+`;
 
 export const addConsumer = gql`
   mutation ($fullName: String!) {
     addConsumer(fullName: $fullName) {
-    consumerID
+      consumerID
+    }
   }
-}
+`;
+
+export const deleteConsumers = gql`
+  mutation ($consumerId: [String!]!) {
+    deleteConsumers(consumerIDs: $consumerId) {
+      consumerID
+    }
+  }
 `;
