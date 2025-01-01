@@ -36,3 +36,20 @@ export const deleteConsumers = gql`
     }
   }
 `;
+export const addCounter = gql`
+  mutation (
+    $counterNumber: String!
+    $price: String!
+    $status: String!
+    $consumerID: String!
+  ) {
+    addCounter(
+      counterNumber: $counterNumber
+      price: $price
+      status: $status
+      consumerID: $consumerID
+    ) {
+      counterID
+    }
+  }
+`;

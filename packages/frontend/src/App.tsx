@@ -4,7 +4,7 @@ import './App.css';
 import AddConsumer from './components/pages/consumer/AddConsumer';
 import Consumer from './components/pages/consumer/Consumer';
 import ConsumerList from './components/pages/consumer/ConsumerList';
-import Counter from './components/pages/Counter';
+import Counter from './components/pages/counter/Counter';
 import Debt from './components/pages/Debt';
 import Home from './components/pages/Home';
 import Invoice from './components/pages/Invoice';

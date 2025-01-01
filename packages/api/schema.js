@@ -13,7 +13,7 @@ type User {
 type Counter {
     counterID: ID!
     status: String!
-    price: Int!
+    price: String!
     createdAt: String!
     updatedAt: String
     user: User!
@@ -88,6 +88,7 @@ type Query {
 
 type Mutation {
     addConsumer(fullName: String!):Consumer!
+    addCounter(counterNumber: String!, consumerID:String!, price:String!):Consumer!
     updateConsumer(id: String, edits:updateConsumerInput):Consumer
     deleteConsumers(consumerIDs: [String!]!): [Consumer]
 }
@@ -265,7 +266,6 @@ export const resolvers = {
                   } else {
                     console.log('==>rows', rows);
                     resolve(rows); // Return the deleted consumers' data
-                  
                   }
                 },
               );
