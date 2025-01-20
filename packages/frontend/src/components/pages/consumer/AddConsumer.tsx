@@ -1,10 +1,12 @@
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { Button, TextField, Typography } from '@mui/material';
 import { useFormik } from 'formik';
+import { enqueueSnackbar } from 'notistack';
 import { useEffect, useState } from 'react';
 import * as yup from 'yup';
-import { addConsumer } from '../../../api/apollo';
+import { addConsumer, getConsumers } from '../../../api/apollo';
 import { addConsumerType } from './AddConsumer.type';
+
 function AddConsumer() {
   const initialValues: addConsumerType = {
     fullName: '',
@@ -28,11 +30,19 @@ function AddConsumer() {
     setConsumer(formik.values);
   }, [formik.values]);
 
+  const { refetch } = useQuery(getConsumers);
+
   const [submit, { loading, error, data }] = useMutation(addConsumer, {
     onCompleted: (res) => {
-      console.log('==>onCompleted', res);
+      console.log('==>onCompleted', res.addConsumer.consumerID);
+      res.addConsumer.consumerID &&
+        enqueueSnackbar('Consomateur ajouté', { variant: 'success' });
+
+      // Refetch the consumer list after adding a new one
+      refetch();
     },
   });
+
   if (loading) {
     console.log('==>loading', loading);
   }
@@ -65,6 +75,7 @@ function AddConsumer() {
           variant="contained"
           fullWidth
           type="submit"
+          disabled={formik.values.fullName === '' && true}
           onClick={() => submit({ variables: consumer })}
         >
           Ajouter

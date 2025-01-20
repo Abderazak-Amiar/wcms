@@ -1,15 +1,14 @@
 import { Box } from '@mui/material';
 import BasicTabs from '../../organisms/BasicTabs';
-import ConsumerList from './ConsumerList';
 import AddConsumer from './AddConsumer';
-
+import ConsumerList from './ConsumerList';
 
 function Consumers() {
   return (
     <Box>
       <BasicTabs
-        labels={['Ajouter', 'List']}
-        components={[<AddConsumer />, <ConsumerList />]}
+        labels={['List', 'Ajouter']}
+        components={[<ConsumerList />, <AddConsumer />]}
       />
     </Box>
   );

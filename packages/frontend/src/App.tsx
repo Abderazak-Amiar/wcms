@@ -1,4 +1,5 @@
 import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { SnackbarProvider } from 'notistack';
 import { Route, Routes } from 'react-router-dom';
 import './App.css';
 import AddConsumer from './components/pages/consumer/AddConsumer';
@@ -11,9 +12,9 @@ import Invoice from './components/pages/Invoice';
 import Login from './components/pages/Login';
 import Payment from './components/pages/Payment';
 import Protected from './components/pages/Protected';
+import Record from './components/pages/Record';
 import Settings from './components/pages/Settings';
 import isAuthenticated from './helpers';
-
 const theme = createTheme({
   palette: {
     primary: {
@@ -72,6 +73,7 @@ function App() {
         />
         <Route element={<Protected />}>
           <Route path="/home" element={<Home />}>
+            <Route path="record" element={<Record />} />
             <Route path="consumer" element={<Consumer />}>
               <Route path="add" element={<AddConsumer />} />
               <Route path="list" element={<ConsumerList />} />
@@ -85,6 +87,7 @@ function App() {
         </Route>
         <Route path="*" element={<h1>Page not found</h1>} />
       </Routes>
+      <SnackbarProvider />
     </ThemeProvider>
   );
 }

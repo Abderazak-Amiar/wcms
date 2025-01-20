@@ -17,6 +17,7 @@ export const getConsumers = gql`
     consumers {
       consumerID
       fullName
+      createdAt
     }
   }
 `;

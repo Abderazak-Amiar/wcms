@@ -88,7 +88,7 @@ type Query {
 
 type Mutation {
     addConsumer(fullName: String!):Consumer!
-    addCounter(counterNumber: String!, consumerID:String!, price:String!):Consumer!
+    addCounter(counterNumber: String!, consumerID:String!, price:String!, status: String! ):Consumer!
     updateConsumer(id: String, edits:updateConsumerInput):Consumer
     deleteConsumers(consumerIDs: [String!]!): [Consumer]
 }

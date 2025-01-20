@@ -22,12 +22,14 @@ import {
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { visuallyHidden } from '@mui/utils';
+import moment from 'moment';
 import React, { useEffect, useState } from 'react';
 import { deleteConsumers, getConsumers } from '../../../api/apollo';
 
 interface Consumer {
   consumerID: string;
   fullName: string;
+  createdAt: string;
 }
 
 type Order = 'asc' | 'desc';
@@ -62,9 +64,20 @@ const headCells: readonly HeadCell[] = [
     id: 'consumerID',
     numeric: false,
     disablePadding: true,
-    label: 'Consumer ID',
+    label: 'Identificateur',
   },
-  { id: 'fullName', numeric: false, disablePadding: false, label: 'Full Name' },
+  {
+    id: 'fullName',
+    numeric: false,
+    disablePadding: false,
+    label: 'Nom complet',
+  },
+  {
+    id: 'createdAt',
+    numeric: false,
+    disablePadding: false,
+    label: 'Date de Création',
+  },
 ];
 
 interface EnhancedTableProps {
@@ -136,6 +149,7 @@ interface EnhancedTableToolbarProps {
   selected: string[];
   consumers: Consumer[];
   setConsumers: React.Dispatch<React.SetStateAction<Consumer[]>>;
+  refetchConsumers: () => void; // New prop for refetch
 }
 
 const EnhancedTableToolbar = ({
@@ -143,11 +157,11 @@ const EnhancedTableToolbar = ({
   selected,
   consumers,
   setConsumers,
+  refetchConsumers, // Use refetch in toolbar
 }: EnhancedTableToolbarProps) => {
   const [deleteConsumer, { loading, error }] = useMutation(deleteConsumers);
 
   const handleDelete = async (consumerIDs: string[]) => {
-    console.log('==>consumerIDs', consumerIDs);
     if (!consumerIDs || consumerIDs.length === 0) {
       console.error('No consumers selected for deletion');
       return;
@@ -158,21 +172,20 @@ const EnhancedTableToolbar = ({
       const newConsumers = consumers.filter(
         (consumer) => !consumerIDs.includes(consumer.consumerID),
       );
-      console.log('==>newConsumers', newConsumers);
       setConsumers(newConsumers);
 
       // Perform the mutation
       const response = await deleteConsumer({
         variables: { consumerId: consumerIDs },
       });
-      console.log('==>response', response);
-      console.log('Consumers deleted:', response.data.deleteConsumers);
 
-      // You could show a success message here (e.g., Snackbar)
+      // Refetch the data after successful deletion
+      refetchConsumers();
+
+      console.log('Consumers deleted:', response.data.deleteConsumers);
     } catch (err) {
       console.error('Error deleting consumers:', err);
-      // In case of error, restore the consumers list or show an error notification
-      setConsumers(consumers);
+      setConsumers(consumers); // Restore the consumers list if deletion fails
     }
   };
 
@@ -201,7 +214,7 @@ const EnhancedTableToolbar = ({
         </Typography>
       ) : (
         <Typography sx={{ flex: '1 1 100%' }} variant="h6" component="div">
-          Consumer List
+          Liste des consommateurs
         </Typography>
       )}
       {numSelected > 0 ? (
@@ -211,7 +224,7 @@ const EnhancedTableToolbar = ({
           </IconButton>
         </Tooltip>
       ) : (
-        <Tooltip title="Filter list">
+        <Tooltip title="Filtre">
           <IconButton>
             <FilterListIcon />
           </IconButton>
@@ -222,7 +235,7 @@ const EnhancedTableToolbar = ({
 };
 
 export default function ConsumerList() {
-  const { loading, error, data } = useQuery(getConsumers);
+  const { loading, error, data, refetch } = useQuery(getConsumers);
   const [consumers, setConsumers] = useState<Consumer[]>([]);
   const [order, setOrder] = useState<Order>('asc');
   const [orderBy, setOrderBy] = useState<keyof Consumer>('fullName');
@@ -236,6 +249,11 @@ export default function ConsumerList() {
       setConsumers(data.consumers);
     }
   }, [data]);
+
+  // Pass the refetch function to the toolbar
+  const refetchConsumers = () => {
+    refetch();
+  };
 
   const handleRequestSort = (
     event: React.MouseEvent<unknown>,
@@ -312,6 +330,7 @@ export default function ConsumerList() {
           selected={selected}
           consumers={consumers}
           setConsumers={setConsumers}
+          refetchConsumers={refetchConsumers} // Pass refetchConsumers here
         />
         <TableContainer>
           <Table
@@ -328,7 +347,8 @@ export default function ConsumerList() {
               rowCount={consumers.length}
             />
             <TableBody>
-              {visibleRows.map((row) => {
+              {visibleRows.map((row, index) => {
+                console.log('==>row', row);
                 const isItemSelected = selected.includes(row.consumerID);
                 const labelId = `enhanced-table-checkbox-${row.consumerID}`;
 
@@ -357,9 +377,14 @@ export default function ConsumerList() {
                       scope="row"
                       padding="none"
                     >
-                      {row.consumerID}
+                      {index + 1}
                     </TableCell>
                     <TableCell align="left">{row.fullName}</TableCell>
+                    <TableCell align="left">
+                      {moment(Number(row.createdAt)).format(
+                        'DD-MM-YYYY HH:mm:ss',
+                      )}
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -383,11 +408,12 @@ export default function ConsumerList() {
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
+          labelRowsPerPage="Lignes par page"
         />
       </Paper>
       <FormControlLabel
         control={<Switch checked={dense} onChange={handleChangeDense} />}
-        label="Dense padding"
+        label="Marge dense"
       />
     </Box>
   );

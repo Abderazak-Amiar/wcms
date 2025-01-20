@@ -1,3 +1,4 @@
+import CountertopsIcon from '@mui/icons-material/Countertops';
 import GasMeterIcon from '@mui/icons-material/GasMeter';
 import PaidIcon from '@mui/icons-material/Paid';
 import PeopleIcon from '@mui/icons-material/People';
@@ -16,6 +17,7 @@ import Grid from '@mui/material/Grid2';
 import { Link, Outlet } from 'react-router-dom';
 function Home() {
   const icons = [
+    <CountertopsIcon />,
     <PeopleIcon />,
     <GasMeterIcon />,
     <ReceiptIcon />,
@@ -23,6 +25,7 @@ function Home() {
     <PointOfSaleIcon />,
   ];
   const menuFr = [
+    'Recensement',
     'Consomateur',
     'Compteur',
     'Facture',
@@ -31,6 +34,7 @@ function Home() {
     'Paramètres',
   ];
   const menu = [
+    'record',
     'consumer',
     'counter',
     'invoice',
