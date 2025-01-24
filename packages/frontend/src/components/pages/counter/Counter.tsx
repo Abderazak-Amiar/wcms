@@ -7,8 +7,8 @@ function Counter() {
   return (
     <Box>
       <BasicTabs
-        labels={['Ajouter', 'List']}
-        components={[<AddCounter />, <CounterList />]}
+        labels={['List', 'Ajouter']}
+        components={[<CounterList />, <AddCounter />]}
       />
     </Box>
   );

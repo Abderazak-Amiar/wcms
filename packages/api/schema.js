@@ -88,7 +88,7 @@ type Query {
 
 type Mutation {
     addConsumer(fullName: String!):Consumer!
-    addCounter(counterNumber: String!, consumerID:String!, price:String!, status: String! ):Consumer!
+    addCounter(counterID: String!, consumerID:String!, price:String!):Counter!
     updateConsumer(id: String, edits:updateConsumerInput):Consumer
     deleteConsumers(consumerIDs: [String!]!): [Consumer]
 }
@@ -212,6 +212,45 @@ export const resolvers = {
               } else {
                 // Row was inserted successfully
                 resolve({ consumerID: newConsumer.consumerID });
+              }
+            },
+          );
+        });
+      });
+    },
+    addCounter(_, args) {
+      console.log('==>args',args);
+      let newCounter = {
+        counterID: args.counterID, // Manually generated ID
+        createdAt: Date.now(),
+        userID: '1', // Assuming a fixed userID for this example
+        price: args.price,
+        consumerID: args.consumerID,
+        status: 'En Marche',
+      };
+
+      return new Promise((resolve, reject) => {
+        db.serialize(function () {
+          db.run(
+            `INSERT INTO counter (counterID, createdAt, userID, price, consumerID, status) VALUES (?, ?, ?, ?, ? ,?)`,
+            [
+              newCounter.counterID,
+              newCounter.createdAt,
+              newCounter.userID,
+              newCounter.price,
+              newCounter.consumerID,
+              newCounter.status,
+            ],
+            function (err) {
+              if (err) {
+                console.error(err.message);
+                reject(err);
+              } else if (this.changes === 0) {
+                // No rows were inserted
+                reject(new Error('Row insertion failed.'));
+              } else {
+                // Row was inserted successfully
+                resolve({ counterID: newCounter.counterID });
               }
             },
           );

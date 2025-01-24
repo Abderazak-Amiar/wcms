@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { Autocomplete, Button, TextField, Typography } from '@mui/material';
-import { FormikHelpers, useFormik } from 'formik';
+import { useFormik } from 'formik';
 import { useState } from 'react';
 import * as yup from 'yup';
 import { addCounter, getConsumers } from '../../../api/apollo';
@@ -11,21 +11,21 @@ type Consumer = {
   fullName: string;
 };
 
-interface AddCounterFormValues {
-  counterNumber: string;
+type AddCounterFormValues = {
+  counterID: string;
   price: string;
   consumerID: string;
-}
+};
 
 function AddCounter() {
   const initialValues: AddCounterFormValues = {
-    counterNumber: '',
+    counterID: '',
     price: '',
     consumerID: '',
   };
 
   const validationSchema = yup.object({
-    counterNumber: yup.string().required('Numéro compteur requis'),
+    counterID: yup.string().required('Numéro compteur requis'),
     price: yup.string().required('Prix requis'),
     consumerID: yup.string().required('Consomateur requis'),
   });
@@ -34,12 +34,8 @@ function AddCounter() {
   const formik = useFormik<AddCounterFormValues>({
     initialValues,
     validationSchema,
-    onSubmit: (
-      values: AddCounterFormValues,
-      formikHelpers: FormikHelpers<AddCounterFormValues>,
-    ) => {
+    onSubmit: (values: AddCounterFormValues) => {
       console.log('==>values', values);
-      // Call the mutation on submit
       submit({ variables: values });
     },
   });
@@ -77,18 +73,14 @@ function AddCounter() {
         {/* Counter Number Field */}
         <TextField
           fullWidth
-          id="counterNumber"
-          name="counterNumber"
+          id="counterID"
+          name="counterID"
           label="Numéro de compteur"
-          value={formik.values.counterNumber}
+          value={formik.values.counterID}
           onChange={formik.handleChange}
           onBlur={formik.handleBlur}
-          error={
-            formik.touched.counterNumber && Boolean(formik.errors.counterNumber)
-          }
-          helperText={
-            formik.touched.counterNumber && formik.errors.counterNumber
-          }
+          error={formik.touched.counterID && Boolean(formik.errors.counterID)}
+          helperText={formik.touched.counterID && formik.errors.counterID}
           sx={{ marginBlock: '8px' }}
         />
 
