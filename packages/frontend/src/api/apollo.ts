@@ -21,6 +21,17 @@ export const getConsumers = gql`
     }
   }
 `;
+export const getCounters = gql`
+  query {
+    counters {
+      counterID
+      consumerID
+      status
+      createdAt
+      price
+    }
+  }
+`;
 
 export const addConsumer = gql`
   mutation ($fullName: String!) {
@@ -34,6 +45,13 @@ export const deleteConsumers = gql`
   mutation ($consumerId: [String!]!) {
     deleteConsumers(consumerIDs: $consumerId) {
       consumerID
+    }
+  }
+`;
+export const deleteCounters = gql`
+  mutation ($counterId: [String!]!) {
+    deleteCounters(counterIDs: $counterId) {
+      counterId
     }
   }
 `;

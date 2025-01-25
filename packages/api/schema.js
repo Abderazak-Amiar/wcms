@@ -12,12 +12,13 @@ type User {
 
 type Counter {
     counterID: ID!
+    consumerID: String!
     status: String!
     price: String!
     createdAt: String!
     updatedAt: String
-    user: User!
-    consumer: Consumer!
+    user: User
+    consumer: Consumer
     }
 
 type Consumer{
@@ -91,6 +92,7 @@ type Mutation {
     addCounter(counterID: String!, consumerID:String!, price:String!):Counter!
     updateConsumer(id: String, edits:updateConsumerInput):Consumer
     deleteConsumers(consumerIDs: [String!]!): [Consumer]
+    deleteCounters(counterIDs: [String!]!): [Counter]
 }
 input addConsumerInput {
     fullName: String!
@@ -121,6 +123,19 @@ export const resolvers = {
       return new Promise((resolve, reject) => {
         db.serialize(() => {
           db.all(`SELECT * FROM consumer`, (err, row) => {
+            if (err) {
+              console.error(err.message);
+              reject();
+            }
+            resolve(row);
+          });
+        });
+      });
+    },
+    counters: () => {
+      return new Promise((resolve, reject) => {
+        db.serialize(() => {
+          db.all(`SELECT * FROM counter`, (err, row) => {
             console.log('==>row', row);
             if (err) {
               console.error(err.message);
@@ -219,7 +234,7 @@ export const resolvers = {
       });
     },
     addCounter(_, args) {
-      console.log('==>args',args);
+      console.log('==>args', args);
       let newCounter = {
         counterID: args.counterID, // Manually generated ID
         createdAt: Date.now(),
@@ -313,7 +328,41 @@ export const resolvers = {
         });
       });
     },
-
+    deleteCounters(_, { counterIDs }) {
+      return new Promise((resolve, reject) => {
+        db.serialize(() => {
+          const placeholders = counterIDs.map(() => '?').join(', ');
+          db.all(
+            `SELECT * FROM counter WHERE counterID IN (${placeholders})`,
+            counterIDs,
+            (err, rows) => {
+              if (err) {
+                console.error(err.message);
+                reject(err);
+                return;
+              }
+              if (!rows.length) {
+                reject(new Error('No consumers found with the provided IDs.'));
+                return;
+              }
+              db.run(
+                `DELETE FROM counter WHERE counterID IN (${placeholders})`,
+                counterIDs,
+                (err) => {
+                  if (err) {
+                    console.error(err.message);
+                    reject(err);
+                  } else {
+                    console.log('==>rows', rows);
+                    resolve(rows); // Return the deleted consumers' data
+                  }
+                },
+              );
+            },
+          );
+        });
+      });
+    },
     // deleteConsumers(_, { consumerIDs }) {
     //   return new Promise((resolve, reject) => {
     //     db.serialize(() => {
