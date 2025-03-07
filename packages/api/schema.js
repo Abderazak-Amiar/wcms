@@ -1,3 +1,4 @@
+import moment from 'moment';
 import { v4 as uuid } from 'uuid';
 import { db } from './db.js';
 export const typeDefs = `#graphql
@@ -7,22 +8,22 @@ type User {
     password: String!
     role: String!
     createdAt: String!
-    UpdatedAt: String
+    updatedAt: String
 }
 
 type Counter {
     counterID: ID!
-    consumerID: String!
+    consumerID: ID!
     status: String!
     price: String!
     createdAt: String!
     updatedAt: String
     user: User
     consumer: Consumer
-    }
+}
 
-type Consumer{
-    consumerID: String!
+type Consumer {
+    consumerID: ID!
     fullName: String!
     createdAt: String!
     updatedAt: String
@@ -35,42 +36,41 @@ type Record {
     period: String!
     recordDate: String!
     nextRecordDate: String!
-    oldRecord: String
+    oldRecord: String!
     newRecord: String!
     createdAt: String!
     updatedAt: String
-    counterID: String!
-    consumerID: String!
-    userID: String!
+    counter: Counter
+    consumer: Consumer
 }
 
-type invoice {
+type Invoice {
   invoiceID: ID!
   amount: String!
   paymentCode: String!
   paymentDate: String!
-  isPaid: String!
-  isPrinted: String!
+  isPaid: Boolean!
+  isPrinted: Boolean!
   createdAt: String!
   updatedAt: String
-  consumerID: String!
-  debtID: String!
-  recordID: String!
-  userID: String!
+  consumerID: ID!
+  debtID: ID!
+  recordID: ID!
+  userID: ID!
 }
 
-type debt {
+type Debt {
   debtID: ID!
   amount: String!
-  isPaid: String!
+  isPaid: Boolean!
   createdAt: String!
   updatedAt: String
-  invoiceID: String!
-  consumerID: String!
-  userID: String!
+  invoiceID: ID!
+  consumerID: ID!
+  userID: ID!
 }
 
-type settings {
+type Settings {
   m3Price: String!
   village: String!
   createdAt: String!
@@ -79,23 +79,24 @@ type settings {
 
 type Query {
     users: [User]
-    user(userID:ID!):User
+    user(userID: ID!): User
     userLogin(userName: String!, password: String!): User
     counters: [Counter]
-    counter(id:ID!): Counter
-    consumers: [Consumer] 
-    consumer(consumerID:ID!): Consumer
+    counter(counterID: ID!): Counter
+    consumers: [Consumer]
+    consumer(consumerID: ID!): Consumer
+    getInvoice(recordID: ID!): Invoice
 }
 
 type Mutation {
-    addConsumer(fullName: String!):Consumer!
-    addCounter(counterID: String!, consumerID:String!, price:String!):Counter!
-    updateConsumer(id: String, edits:updateConsumerInput):Consumer
-    deleteConsumers(consumerIDs: [String!]!): [Consumer]
-    deleteCounters(counterIDs: [String!]!): [Counter]
-}
-input addConsumerInput {
-    fullName: String!
+    addConsumer(fullName: String!): Consumer!
+    addRecord(newRecord: String!, counterID: ID!, consumerID: ID!, period:String!): Record!
+    addCounter(counterID: ID!, consumerID: ID!, price: String!): Counter!
+    updateConsumer(consumerID: ID!, edits: updateConsumerInput!): Consumer
+    deleteConsumers(consumerIDs: [ID!]!): [Consumer]
+    deleteCounters(counterIDs: [ID!]!): [Counter]
+    addSettings(m3Price: String!, village: String!): Settings!
+    updateSettings(m3Price: String!, village: String!): Settings!
 }
 
 input updateConsumerInput {
@@ -106,52 +107,21 @@ input updateConsumerInput {
 
 export const resolvers = {
   Query: {
-    users: () => {
-      return new Promise((resolve, reject) => {
-        db.serialize(() => {
-          db.all(`SELECT * FROM user`, (err, row) => {
-            if (err) {
-              console.error(err.message);
-              reject();
-            }
-            resolve(row);
-          });
+    users: () =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+        db.all(`SELECT * FROM user`, (err, rows) => {
+          console.log('==>rows', rows);
+          if (err) reject(err);
+          console.log('==>rows', rows);
+          resolve(rows);
         });
-      });
-    },
-    consumers: () => {
-      return new Promise((resolve, reject) => {
-        db.serialize(() => {
-          db.all(`SELECT * FROM consumer`, (err, row) => {
-            if (err) {
-              console.error(err.message);
-              reject();
-            }
-            resolve(row);
-          });
-        });
-      });
-    },
-    counters: () => {
-      return new Promise((resolve, reject) => {
-        db.serialize(() => {
-          db.all(`SELECT * FROM counter`, (err, row) => {
-            console.log('==>row', row);
-            if (err) {
-              console.error(err.message);
-              reject();
-            }
-            resolve(row);
-            console.log('==> resolve(row)', resolve(row));
-          });
-        });
-      });
-    },
+      }),
     user: (parent, args) => {
       return new Promise((resolve, reject) => {
         db.serialize(() => {
           db.get(
-            `SELECT * FROM user WHERE user.userID = '${args.userID}'`,
+            `SELECT * FROM user WHERE args.userID = '${args.userID}'`,
             (err, row) => {
               if (err) {
                 console.error(err.message);
@@ -179,236 +149,407 @@ export const resolvers = {
         });
       });
     },
-
-    consumer: (parent, args) => {
-      return new Promise((resolve, reject) => {
-        db.serialize(() => {
-          db.get(
-            `SELECT * FROM consumer WHERE consumer.consumerID = '${args.consumerID}'`,
-            (err, row) => {
-              if (err) {
-                console.error(err.message);
-                reject({});
-              }
-              console.log('==>row', row);
-              resolve(row);
-            },
-          );
+    consumers: () =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+        db.all(`SELECT * FROM consumer`, (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
         });
+      }),
+
+    consumer: (_, { consumerID }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+        db.get(
+          `SELECT * FROM consumer WHERE consumerID = ?`,
+          [consumerID],
+          (err, row) => {
+            if (err) reject(err);
+            resolve(row);
+          },
+        );
+      }),
+
+    counters: () =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+        db.all(`SELECT * FROM counter`, (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        });
+      }),
+
+    counter: (_, { counterID }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+        db.get(
+          `SELECT * FROM counter WHERE counterID = ?`,
+          [counterID],
+          (err, row) => {
+            if (err) reject(err);
+            resolve(row);
+          },
+        );
+      }),
+    getInvoice: async (_, { recordID }) => {
+      console.log('==>recordID', recordID);
+      if (!db.open) throw new Error('Database is closed');
+
+      return new Promise((resolve, reject) => {
+        db.get(
+          `SELECT r.*, s.m3Price, s.village 
+             FROM record r 
+             JOIN settings s ON 1=1 
+             WHERE r.recordID = ?`,
+          [recordID],
+          (err, row) => {
+            if (err) return reject(err);
+            if (!row) return reject(new Error('Record not found'));
+
+            const consumption = row.newRecord - row.oldRecord;
+            const totalAmount = consumption * parseFloat(row.m3Price);
+
+            resolve({
+              recordID: row.recordID,
+              consumerID: row.consumerID,
+              counterID: row.counterID,
+              period: row.period,
+              recordDate: row.recordDate,
+              oldRecord: row.oldRecord,
+              newRecord: row.newRecord,
+              consumption,
+              totalAmount,
+              m3Price: parseFloat(row.m3Price),
+              village: row.village,
+            });
+          },
+        );
       });
     },
   },
-  Mutation: {
-    addConsumer(_, args) {
-      let newConsumer = {
-        consumerID: uuid(), // Manually generated ID
-        createdAt: Date.now(),
-        userID: '1', // Assuming a fixed userID for this example
-        fullName: args.fullName,
-      };
 
-      return new Promise((resolve, reject) => {
-        db.serialize(function () {
-          db.run(
-            `INSERT INTO consumer (consumerID, fullName, createdAt, userID) VALUES (?, ?, ?, ?)`,
-            [
-              newConsumer.consumerID,
-              newConsumer.fullName,
-              newConsumer.createdAt,
-              newConsumer.userID,
-            ],
-            function (err) {
-              if (err) {
-                console.error(err.message);
-                reject(err);
-              } else if (this.changes === 0) {
-                // No rows were inserted
-                reject(new Error('Row insertion failed.'));
-              } else {
-                // Row was inserted successfully
-                resolve({ consumerID: newConsumer.consumerID });
-              }
-            },
-          );
+  Mutation: {
+    addSettings: (_, { m3Price, village }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+
+        const updatedAt = new Date().toISOString();
+
+        db.get(`SELECT * FROM settings LIMIT 1`, (err, row) => {
+          if (err) return reject(err);
+
+          if (row) {
+            // Update existing settings
+            db.run(
+              `UPDATE settings SET m3Price = ?, village = ?, updatedAt = ? WHERE rowid = (SELECT rowid FROM settings LIMIT 1)`,
+              [m3Price, village, updatedAt],
+              function (err) {
+                if (err) reject(err);
+                resolve({
+                  m3Price,
+                  village,
+                  createdAt: row.createdAt, // Ensure createdAt is returned
+                  updatedAt,
+                });
+              },
+            );
+          } else {
+            // Insert new settings if it doesn't exist
+            const createdAt = new Date().toISOString();
+            db.run(
+              `INSERT INTO settings (m3Price, village, createdAt) VALUES (?, ?, ?)`,
+              [m3Price, village, createdAt],
+              function (err) {
+                if (err) reject(err);
+                resolve({ m3Price, village, createdAt, updatedAt: null });
+              },
+            );
+          }
         });
-      });
-    },
+      }),
+
+    addConsumer: (_, { fullName }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+
+        const newConsumer = {
+          consumerID: uuid(),
+          fullName: fullName.trim(),
+          createdAt: new Date().toISOString(),
+          userID: '1',
+        };
+
+        db.get(
+          `SELECT consumerID FROM consumer WHERE fullName = ?`,
+          [newConsumer.fullName],
+          (err, row) => {
+            if (err) return reject(err);
+            if (row) return reject(new Error('DUPLICATION'));
+
+            db.run(
+              `INSERT INTO consumer (consumerID, fullName, createdAt, userID) VALUES (?, ?, ?, ?)`,
+              [
+                newConsumer.consumerID,
+                newConsumer.fullName,
+                newConsumer.createdAt,
+                newConsumer.userID,
+              ],
+              function (err) {
+                if (err) reject(err);
+                resolve(newConsumer);
+              },
+            );
+          },
+        );
+      }),
+
     addCounter(_, args) {
       console.log('==>args', args);
-      let newCounter = {
-        counterID: args.counterID, // Manually generated ID
-        createdAt: Date.now(),
-        userID: '1', // Assuming a fixed userID for this example
-        price: args.price,
-        consumerID: args.consumerID,
-        status: 'En Marche',
-      };
 
       return new Promise((resolve, reject) => {
-        db.serialize(function () {
-          db.run(
-            `INSERT INTO counter (counterID, createdAt, userID, price, consumerID, status) VALUES (?, ?, ?, ?, ? ,?)`,
-            [
-              newCounter.counterID,
-              newCounter.createdAt,
-              newCounter.userID,
-              newCounter.price,
-              newCounter.consumerID,
-              newCounter.status,
-            ],
-            function (err) {
-              if (err) {
-                console.error(err.message);
-                reject(err);
-              } else if (this.changes === 0) {
-                // No rows were inserted
-                reject(new Error('Row insertion failed.'));
-              } else {
-                // Row was inserted successfully
-                resolve({ counterID: newCounter.counterID });
+        db.get(
+          `SELECT status FROM counter WHERE consumerID = ?`,
+          [args.consumerID],
+          (err, row) => {
+            if (err) return reject(err);
+
+            if (row) {
+              if (row.status === 'En Marche') {
+                return reject(new Error('ACTIVE_COUNTER_EXISTS'));
               }
-            },
-          );
-        });
-      });
-    },
-    updateConsumer(_, args) {
-      const { consumerID, fullName, email, address } = args;
-      return new Promise((resolve, reject) => {
-        db.serialize(function () {
-          const query = `UPDATE consumer SET fullName = ?, email = ?, address = ? WHERE consumerID = ?`;
-          db.run(query, [fullName, email, address, consumerID], function (err) {
-            if (err) {
-              console.error(err.message);
-              reject(err);
-            } else if (this.changes === 0) {
-              reject(new Error('Consumer not found with the provided ID.'));
-            } else {
-              resolve({
-                consumerID,
-                message: `Consumer with ID ${consumerID} updated successfully.`,
-              });
+              return reject(new Error('DUPLICATE_COUNTER_ID'));
             }
-          });
-        });
+
+            // If no counter exists or all are not "En Marche", proceed with insertion
+            const newCounter = {
+              counterID: args.counterID,
+              createdAt: new Date().toISOString(),
+              userID: '1',
+              price: args.price,
+              consumerID: args.consumerID,
+              status: 'En Marche',
+            };
+
+            db.run(
+              `INSERT INTO counter (counterID, createdAt, userID, price, consumerID, status) 
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+              [
+                newCounter.counterID,
+                newCounter.createdAt,
+                newCounter.userID,
+                newCounter.price,
+                newCounter.consumerID,
+                newCounter.status,
+              ],
+              function (err) {
+                if (err) return reject(err);
+                resolve({ counterID: newCounter.counterID });
+              },
+            );
+          },
+        );
       });
     },
-    deleteConsumers(_, { consumerIDs }) {
-      return new Promise((resolve, reject) => {
-        db.serialize(() => {
-          const placeholders = consumerIDs.map(() => '?').join(', ');
-          db.all(
-            `SELECT * FROM consumer WHERE consumerID IN (${placeholders})`,
-            consumerIDs,
-            (err, rows) => {
-              if (err) {
-                console.error(err.message);
-                reject(err);
-                return;
-              }
-              if (!rows.length) {
-                reject(new Error('No consumers found with the provided IDs.'));
-                return;
-              }
-              db.run(
-                `DELETE FROM consumer WHERE consumerID IN (${placeholders})`,
-                consumerIDs,
-                (err) => {
-                  if (err) {
-                    console.error(err.message);
-                    reject(err);
-                  } else {
-                    console.log('==>rows', rows);
-                    resolve(rows); // Return the deleted consumers' data
-                  }
+
+    addRecord: (_, { newRecord, counterID, consumerID, userID = 1 }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+
+        const period = 'Jan-March';
+
+        db.get(
+          `SELECT * FROM record WHERE period = ? AND consumerID = ?`,
+          [period, consumerID],
+          (err, row) => {
+            if (err) return reject(err);
+
+            const isUpdating = !!row;
+            const recordID = isUpdating ? row.recordID : uuid();
+            const oldRecord = isUpdating ? row.newRecord : 400; // Use the last newRecord as oldRecord
+            const createdAt = isUpdating
+              ? row.createdAt
+              : new Date().toISOString();
+            const updatedAt = new Date().toISOString();
+
+            // **Check if newRecord is greater than oldRecord**
+            if (newRecord <= oldRecord) {
+              return reject(new Error(`INVALID_RECORD`));
+            }
+
+            const recordDate = moment().toISOString();
+            const nextRecordDate = moment(recordDate)
+              .add(3, 'months')
+              .toISOString();
+
+            const newRecordObj = {
+              recordID,
+              period,
+              recordDate,
+              nextRecordDate,
+              oldRecord,
+              newRecord,
+              createdAt,
+              updatedAt,
+              counterID,
+              consumerID,
+              userID,
+            };
+
+            const query = isUpdating
+              ? `UPDATE record 
+                 SET recordDate = ?, nextRecordDate = ?, oldRecord = ?, 
+                     newRecord = ?, updatedAt = ?, counterID = ?, consumerID = ?, userID = ? 
+                 WHERE recordID = ?`
+              : `INSERT INTO record 
+                 (recordID, period, recordDate, nextRecordDate, oldRecord, newRecord, createdAt, updatedAt, counterID, consumerID, userID) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+            const params = isUpdating
+              ? [
+                  newRecordObj.recordDate,
+                  newRecordObj.nextRecordDate,
+                  newRecordObj.oldRecord,
+                  newRecordObj.newRecord,
+                  newRecordObj.updatedAt,
+                  newRecordObj.counterID,
+                  newRecordObj.consumerID,
+                  newRecordObj.userID,
+                  newRecordObj.recordID,
+                ]
+              : Object.values(newRecordObj);
+
+            db.run(query, params, function (err) {
+              if (err) return reject(err);
+
+              db.get(
+                `SELECT m3price FROM settings LIMIT 1`,
+                [],
+                (err, settingsRow) => {
+                  if (err) return reject(err);
+                  if (!settingsRow)
+                    return reject(new Error('Settings not found'));
+
+                  const consumption =
+                    newRecordObj.newRecord - newRecordObj.oldRecord;
+                  const totalAmount =
+                    consumption * parseFloat(settingsRow.m3price);
+                  const invoiceID = uuid();
+                  const debtID = uuid();
+                  const paymentCode = `INV-${invoiceID.slice(0, 8)}`;
+
+                  db.run(
+                    `INSERT INTO invoice 
+                   (invoiceID, amount, paymentCode, paymentDate, isPaid, isPrinted, createdAt, updatedAt, consumerID, debtID, recordID, userID) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                      invoiceID,
+                      totalAmount.toFixed(2),
+                      paymentCode,
+                      null, // Payment date is initially null
+                      false, // Not paid initially
+                      false, // Not printed initially
+                      new Date().toISOString(),
+                      updatedAt,
+                      consumerID,
+                      debtID,
+                      newRecordObj.recordID,
+                      userID,
+                    ],
+                    function (err) {
+                      if (err) return reject(err);
+                      return resolve(newRecordObj);
+                    },
+                  );
                 },
               );
-            },
-          );
-        });
-      });
-    },
-    deleteCounters(_, { counterIDs }) {
+            });
+          },
+        );
+      }),
+
+    deleteConsumers: (_, { consumerIDs }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+
+        db.run(
+          `DELETE FROM consumer WHERE consumerID IN (${consumerIDs
+            .map(() => '?')
+            .join(', ')})`,
+          consumerIDs,
+          function (err) {
+            if (err) reject(err);
+            resolve(consumerIDs);
+          },
+        );
+      }),
+
+    deleteCounters: (_, { counterIDs }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+
+        db.run(
+          `DELETE FROM counter WHERE counterID IN (${counterIDs
+            .map(() => '?')
+            .join(', ')})`,
+          counterIDs,
+          function (err) {
+            if (err) reject(err);
+            resolve(counterIDs);
+          },
+        );
+      }),
+  },
+  Counter: {
+    consumer: (parent) => {
       return new Promise((resolve, reject) => {
-        db.serialize(() => {
-          const placeholders = counterIDs.map(() => '?').join(', ');
-          db.all(
-            `SELECT * FROM counter WHERE counterID IN (${placeholders})`,
-            counterIDs,
-            (err, rows) => {
-              if (err) {
-                console.error(err.message);
-                reject(err);
-                return;
-              }
-              if (!rows.length) {
-                reject(new Error('No consumers found with the provided IDs.'));
-                return;
-              }
-              db.run(
-                `DELETE FROM counter WHERE counterID IN (${placeholders})`,
-                counterIDs,
-                (err) => {
-                  if (err) {
-                    console.error(err.message);
-                    reject(err);
-                  } else {
-                    console.log('==>rows', rows);
-                    resolve(rows); // Return the deleted consumers' data
-                  }
-                },
-              );
-            },
-          );
-        });
+        db.get(
+          `SELECT * FROM consumer WHERE consumerID = ?`,
+          [parent.consumerID],
+          (err, row) => {
+            if (err) reject(err);
+            resolve(row);
+          },
+        );
       });
     },
-    // deleteConsumers(_, { consumerIDs }) {
-    //   return new Promise((resolve, reject) => {
-    //     db.serialize(() => {
-    //       const placeholders = consumerIDs.map(() => '?').join(', ');
-    //       console.log('==>placeholders', placeholders);
-    //       db.run(
-    //         `DELETE FROM consumer WHERE consumerID IN (${placeholders})`,
-    //         consumerIDs,
-    //         function (err) {
-    //           if (err) {
-    //             console.error(err.message);
-    //             reject(err);
-    //           } else if (this.changes === 0) {
-    //             reject(new Error('No consumers found with the provided IDs.'));
-    //           } else {
-    //             // Fetch deleted consumers to return them
-    //             db.all(
-    //               `SELECT * FROM consumer WHERE consumerID IN (${placeholders})`,
-    //               consumerIDs,
-    //               (err, rows) => {
-    //                 if (err) {
-    //                   console.error(err.message);
-    //                   reject(err);
-    //                 } else {
-    //                   resolve(rows); // Return the deleted consumers' data
-    //                 }
-    //               },
-    //             );
-    //           }
-    //         },
-    //       );
-    //     });
-    //   });
-    // },
+    user: (parent) => {
+      return new Promise((resolve, reject) => {
+        db.get(
+          `SELECT * FROM user WHERE userID = ?`,
+          [parent.userID],
+          (err, row) => {
+            if (err) reject(err);
+            resolve(row);
+          },
+        );
+      });
+    },
+  },
+  Consumer: {
+    user: (parent) => {
+      return new Promise((resolve, reject) => {
+        db.get(
+          `SELECT * FROM user WHERE userID = ?`,
+          [parent.userID],
+          (err, row) => {
+            if (err) reject(err);
+            resolve(row);
+          },
+        );
+      });
+    },
+    counters: (parent) => {
+      return new Promise((resolve, reject) => {
+        db.all(
+          `SELECT * FROM counter WHERE consumerID = ?`,
+          [parent.consumerID],
+          (err, rows) => {
+            if (err) reject(err);
+            resolve(rows);
+          },
+        );
+      });
+    },
   },
 };
-// updateConsumer(_, args) {
-//   // let updatedConsumers = consumers.map((c) => {
-//   //   if (c.id == args.id) {
-//   //     return { ...c, ...args.edits };
-//   //   }
-//   //   return c;
-//   // });
-//   // return updatedConsumers.find((c) => c.id == args.id);
-// },
-// deleteConsumer(_, args) {
-//   // const data = consumers.filter((c) => c.id !== args.id);
-//   // return data;
-// },

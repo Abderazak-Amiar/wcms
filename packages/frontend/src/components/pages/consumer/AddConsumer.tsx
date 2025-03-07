@@ -34,12 +34,17 @@ function AddConsumer() {
 
   const [submit, { loading, error, data }] = useMutation(addConsumer, {
     onCompleted: (res) => {
-      console.log('==>onCompleted', res.addConsumer.consumerID);
-      res.addConsumer.consumerID &&
-        enqueueSnackbar('Consomateur ajouté', { variant: 'success' });
-
-      // Refetch the consumer list after adding a new one
+      console.log('==>onCompleted', res);
+      enqueueSnackbar('Consomateur ajouté', { variant: 'success' });
       refetch();
+    },
+    onError: (err) => {
+      console.log('==>error', err);
+      if (err.message.includes('DUPLICATION')) {
+        enqueueSnackbar('Consomateur existe', { variant: 'warning' });
+      } else {
+        enqueueSnackbar('Une erreur est survenue', { variant: 'error' });
+      }
     },
   });
 

@@ -381,7 +381,7 @@ export default function ConsumerList() {
                     </TableCell>
                     <TableCell align="left">{row.fullName}</TableCell>
                     <TableCell align="left">
-                      {moment(Number(row.createdAt)).format(
+                      {moment(row.createdAt).format(
                         'DD-MM-YYYY HH:mm:ss',
                       )}
                     </TableCell>

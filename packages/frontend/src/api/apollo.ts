@@ -18,6 +18,10 @@ export const getConsumers = gql`
       consumerID
       fullName
       createdAt
+      counters {
+        counterID
+        status
+      }
     }
   }
 `;
@@ -29,6 +33,9 @@ export const getCounters = gql`
       status
       createdAt
       price
+      consumer {
+        fullName
+      }
     }
   }
 `;
@@ -37,6 +44,32 @@ export const addConsumer = gql`
   mutation ($fullName: String!) {
     addConsumer(fullName: $fullName) {
       consumerID
+    }
+  }
+`;
+export const addRecord = gql`
+  mutation (
+    $consumerID: ID!
+    $counterID: ID!
+    $newRecord: String!
+    $period: String!
+  ) {
+    addRecord(
+      consumerID: $consumerID
+      counterID: $counterID
+      newRecord: $newRecord
+      period: $period
+    ) {
+      recordID
+    }
+  }
+`;
+export const addSettings = gql`
+  mutation ($m3Price: String!, $village: String!) {
+    addSettings(m3Price: $m3Price, village: $village) {
+      m3Price
+      village
+      createdAt
     }
   }
 `;
@@ -57,9 +90,32 @@ export const deleteCounters = gql`
 `;
 
 export const addCounter = gql`
-  mutation ($counterID: String!, $price: String!, $consumerID: String!) {
+  mutation ($counterID: ID!, $price: String!, $consumerID: ID!) {
     addCounter(counterID: $counterID, price: $price, consumerID: $consumerID) {
       counterID
+    }
+  }
+`;
+export const GET_RECORD = gql`
+  query GetRecord($recordID: ID!) {
+    record(recordID: $recordID) {
+      recordID
+      consumer {
+        fullName
+      }
+      oldRecord
+      newRecord
+      period
+      createdAt
+    }
+  }
+`;
+
+export const GET_SETTINGS = gql`
+  query GetSettings {
+    settings {
+      m3Price
+      village
     }
   }
 `;

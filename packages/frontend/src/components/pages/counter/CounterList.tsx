@@ -32,6 +32,7 @@ interface Counter {
   status: string;
   createdAt: string;
   price: string;
+  consumer: { fullName: string };
 }
 
 type Order = 'asc' | 'desc';
@@ -66,13 +67,13 @@ const headCells: readonly HeadCell[] = [
     id: 'counterID',
     numeric: false,
     disablePadding: true,
-    label: 'Counter ID',
+    label: 'Numéro Compteur',
   },
   {
     id: 'consumerID',
     numeric: false,
     disablePadding: false,
-    label: 'Consumer ID',
+    label: 'Propriétaire',
   },
   {
     id: 'status',
@@ -90,7 +91,7 @@ const headCells: readonly HeadCell[] = [
     id: 'price',
     numeric: true,
     disablePadding: false,
-    label: 'Price',
+    label: 'Price(DA)',
   },
 ];
 
@@ -251,7 +252,6 @@ const EnhancedTableToolbar = ({
 
 export default function CounterList() {
   const { loading, error, data, refetch } = useQuery(getCounters);
-  console.log('==>data', data);
   const [counters, setCounters] = useState<Counter[]>([]);
   const [order, setOrder] = useState<Order>('asc');
   const [orderBy, setOrderBy] = useState<keyof Counter>('consumerID');
@@ -336,7 +336,7 @@ export default function CounterList() {
   if (loading) return <Typography>Loading...</Typography>;
   if (error)
     return <Typography color="error">Error: {error.message}</Typography>;
-
+  console.log('==>visibleRows', visibleRows);
   return (
     <Box sx={{ width: '100%' }}>
       <Paper sx={{ width: '100%', mb: 2 }}>
@@ -386,12 +386,10 @@ export default function CounterList() {
                       />
                     </TableCell>
                     <TableCell align="left">{row.counterID}</TableCell>
-                    <TableCell align="left">{row.consumerID}</TableCell>
+                    <TableCell align="left">{row.consumer.fullName}</TableCell>
                     <TableCell align="left">{row.status}</TableCell>
                     <TableCell align="left">
-                      {moment(Number(row.createdAt)).format(
-                        'DD-MM-YYYY HH:mm:ss',
-                      )}
+                      {moment(row.createdAt).format('DD-MM-YYYY HH:mm:ss')}
                     </TableCell>
                     <TableCell align="right">{row.price}</TableCell>
                   </TableRow>

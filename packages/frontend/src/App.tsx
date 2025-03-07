@@ -12,7 +12,7 @@ import Invoice from './components/pages/Invoice';
 import Login from './components/pages/Login';
 import Payment from './components/pages/Payment';
 import Protected from './components/pages/Protected';
-import Record from './components/pages/Record';
+import Record from './components/pages/record/Record';
 import Settings from './components/pages/Settings';
 import isAuthenticated from './helpers';
 const theme = createTheme({
