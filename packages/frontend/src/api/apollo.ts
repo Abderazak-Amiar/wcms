@@ -124,6 +124,34 @@ export const GET_INVOICES = gql`
       invoiceID
       createdAt
       amount
+      isPaid
+      isPrinted
+      consumer {
+        consumerID
+        fullName
+      }
+      record {
+        period
+        recordDate
+        nextRecordDate
+        oldRecord
+        newRecord
+      }
+      counter {
+        counterID
+        status
+      }
+    }
+  }
+`;
+export const GET_INVOICE = gql`
+  query GetInvoice($invoiceID: ID!) {
+    invoice(invoiceID: $invoiceID) {
+      invoiceID
+      createdAt
+      amount
+      isPaid
+      isPrinted
       consumer {
         consumerID
         fullName
@@ -174,19 +202,6 @@ export const UPDATE_INVOICE = gql`
       isPaid
       isPrinted
       updatedAt
-    }
-  }
-`;
-export const GET_INVOICE = gql`
-  query GetInvoice($invoiceID: ID!) {
-    invoice(invoiceID: $invoiceID) {
-      invoiceID
-      amount
-      paymentCode
-      paymentDate
-      isPaid
-      isPrinted
-      createdAt
     }
   }
 `;

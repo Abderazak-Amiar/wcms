@@ -1,10 +1,12 @@
 import { useQuery } from '@apollo/client';
 import {
+  Button,
   CircularProgress,
   Dialog,
   DialogContent,
   DialogTitle,
   Divider,
+  Grid,
   Paper,
   Table,
   TableBody,
@@ -33,55 +35,118 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
 
   const invoice = data?.invoice;
 
+  // Fonction pour formater les dates
+  const formatDate = (date: string | null) =>
+    date
+      ? new Date(date).toLocaleDateString('fr-FR', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+        })
+      : 'N/A';
+
+  // Calcul de la consommation en m³
+  const quantityConsumed =
+    (invoice?.record?.newRecord ?? 0) - (invoice?.record?.oldRecord ?? 0);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <Dialog open={!!invoiceID} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>Invoice Details</DialogTitle>
-      <DialogContent>
+      <DialogTitle className="invoice-header">
+        Détails de la Facture
+      </DialogTitle>
+      <DialogContent className="invoice-container">
         {loading ? (
           <CircularProgress />
         ) : error ? (
-          <Typography color="error">Error: {error.message}</Typography>
+          <Typography color="error">Erreur : {error.message}</Typography>
         ) : invoice ? (
           <>
-            {/* Invoice Information */}
-            <Typography>
-              <strong>Invoice ID:</strong> {invoice.invoiceID}
-            </Typography>
-            <Typography>
-              <strong>Customer:</strong> {invoice.customerName}
-            </Typography>
-            <Typography>
-              <strong>Address:</strong> {invoice.customerAddress}
-            </Typography>
-            <Typography>
-              <strong>Issue Date:</strong>{' '}
-              {new Date(invoice.issueDate).toLocaleDateString()}
-            </Typography>
-            <Typography>
-              <strong>Due Date:</strong>{' '}
-              {invoice.dueDate
-                ? new Date(invoice.dueDate).toLocaleDateString()
-                : 'N/A'}
-            </Typography>
-            <Typography>
-              <strong>Paid:</strong> {invoice.isPaid ? 'Yes' : 'No'}
-            </Typography>
+            {/* Première ligne : Informations de la facture et relevé */}
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <Paper sx={{ p: 2 }}>
+                  <Typography>
+                    <strong>Numéro de Facture :</strong> {invoice.invoiceID}
+                  </Typography>
+                  <Typography>
+                    <strong>Période :</strong> {invoice.record?.period ?? 'N/A'}
+                  </Typography>
+                  <Typography>
+                    <strong>Date de Facturation :</strong>{' '}
+                    {formatDate(invoice.createdAt)}
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={6}>
+                <Paper sx={{ p: 2 }}>
+                  <Typography>
+                    <strong>Date du Relevé :</strong>{' '}
+                    {formatDate(invoice.record?.recordDate)}
+                  </Typography>
+                  <Typography>
+                    <strong>Date du Prochain Relevé :</strong>{' '}
+                    {formatDate(invoice.record?.nextRecordDate)}
+                  </Typography>
+                  <Typography>
+                    <strong>Ancien Relevé :</strong>{' '}
+                    {invoice.record?.oldRecord ?? 'N/A'}
+                  </Typography>
+                  <Typography>
+                    <strong>Nouveau Relevé :</strong>{' '}
+                    {invoice.record?.newRecord ?? 'N/A'}
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
 
             <Divider sx={{ my: 2 }} />
 
-            {/* Invoice Items Table */}
+            {/* Deuxième ligne : Détails du consommateur et compteur */}
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <Paper sx={{ p: 2 }}>
+                  <Typography>
+                    <strong>ID du Consommateur :</strong>{' '}
+                    {invoice.consumer?.consumerID ?? 'N/A'}
+                  </Typography>
+                  <Typography>
+                    <strong>Nom du Consommateur :</strong>{' '}
+                    {invoice.consumer?.fullName ?? 'N/A'}
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={6}>
+                <Paper sx={{ p: 2 }}>
+                  <Typography>
+                    <strong>ID du Compteur :</strong>{' '}
+                    {invoice?.counter?.counterID ?? 'N/A'}
+                  </Typography>
+                  <Typography>
+                    <strong>Statut :</strong>{' '}
+                    {invoice?.counter?.status ?? 'N/A'}
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            <Divider sx={{ my: 2 }} />
+
+            {/* Troisième ligne : Tableau de consommation */}
             <TableContainer component={Paper}>
-              <Table>
+              <Table className="invoice-table">
                 <TableHead>
                   <TableRow>
-                    <TableCell>
-                      <strong>Description</strong>
+                    <TableCell align="center">
+                      <strong>Quantité Consommée (m³)</strong>
                     </TableCell>
                     <TableCell align="right">
-                      <strong>Quantity</strong>
-                    </TableCell>
-                    <TableCell align="right">
-                      <strong>Unit Price</strong>
+                      <strong>Prix Unitaire</strong>
                     </TableCell>
                     <TableCell align="right">
                       <strong>Total</strong>
@@ -89,43 +154,33 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {invoice.items && invoice.items.length > 0 ? (
-                    invoice.items.map((item: any, index: number) => (
-                      <TableRow key={index}>
-                        <TableCell>{item.description}</TableCell>
-                        <TableCell align="right">
-                          {item.quantity || 0}
-                        </TableCell>
-                        <TableCell align="right">
-                          ${(item.unitPrice ?? 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell align="right">
-                          $
-                          {(
-                            (item.quantity ?? 0) * (item.unitPrice ?? 0)
-                          ).toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={4} align="center">
-                        No items available
-                      </TableCell>
-                    </TableRow>
-                  )}
+                  <TableRow>
+                    <TableCell align="center">{quantityConsumed}</TableCell>
+                    <TableCell align="right">X.XX €</TableCell>{' '}
+                    {/* Remplace par le prix réel */}
+                    <TableCell align="right">
+                      {Number(invoice.amount ?? 0).toFixed(2)} €
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </TableContainer>
 
-            {/* Total Amount */}
+            {/* Montant Total */}
             <Typography variant="h6" align="right" sx={{ mt: 2 }}>
-              <strong>Total Amount:</strong> $
-              {(invoice.totalAmount ?? 0).toFixed(2)}
+              <strong>Montant Total :</strong>{' '}
+              {Number(invoice.amount ?? 0).toFixed(2)} €
             </Typography>
+
+            {/* Bouton d'impression (Caché en mode impression) */}
+            <div className="invoice-section no-print">
+              <Button variant="contained" color="primary" onClick={handlePrint}>
+                Imprimer la Facture
+              </Button>
+            </div>
           </>
         ) : (
-          <Typography>No invoice details available.</Typography>
+          <Typography>Aucune donnée de facture disponible.</Typography>
         )}
       </DialogContent>
     </Dialog>
