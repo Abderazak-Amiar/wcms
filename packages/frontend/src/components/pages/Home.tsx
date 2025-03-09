@@ -4,6 +4,7 @@ import PaidIcon from '@mui/icons-material/Paid';
 import PeopleIcon from '@mui/icons-material/People';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import ReceiptIcon from '@mui/icons-material/Receipt';
+import SettingsIcon from '@mui/icons-material/Settings';
 import {
   List,
   ListItem,
@@ -23,6 +24,7 @@ function Home() {
     <ReceiptIcon />,
     <PaidIcon />,
     <PointOfSaleIcon />,
+    <SettingsIcon />,
   ];
   const menuFr = [
     'Recensement',

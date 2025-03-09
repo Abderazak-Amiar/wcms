@@ -40,15 +40,19 @@ type Record {
     newRecord: String!
     createdAt: String!
     updatedAt: String
+    counterID:ID!
+    consumerID:ID!
+    userID:ID!
     counter: Counter
     consumer: Consumer
+    
 }
 
 type Invoice {
   invoiceID: ID!
   amount: String!
   paymentCode: String!
-  paymentDate: String!
+  paymentDate: String
   isPaid: Boolean!
   isPrinted: Boolean!
   createdAt: String!
@@ -57,7 +61,14 @@ type Invoice {
   debtID: ID!
   recordID: ID!
   userID: ID!
+  
+  consumer: Consumer
+  debt: Debt
+  record: Record
+  user: User
+  counter: Counter
 }
+
 
 type Debt {
   debtID: ID!
@@ -71,10 +82,14 @@ type Debt {
 }
 
 type Settings {
-  m3Price: String!
-  village: String!
+  m3price: String
+  village: String
   createdAt: String!
   updatedAt: String
+}
+type ResponseMessage {
+  success: Boolean!
+  message: String!
 }
 
 type Query {
@@ -85,7 +100,9 @@ type Query {
     counter(counterID: ID!): Counter
     consumers: [Consumer]
     consumer(consumerID: ID!): Consumer
-    getInvoice(recordID: ID!): Invoice
+    invoices: [Invoice!]!
+    invoice(invoiceID: ID!): Invoice
+    getSettings: Settings
 }
 
 type Mutation {
@@ -97,6 +114,28 @@ type Mutation {
     deleteCounters(counterIDs: [ID!]!): [Counter]
     addSettings(m3Price: String!, village: String!): Settings!
     updateSettings(m3Price: String!, village: String!): Settings!
+    createInvoice(
+    amount: Float!
+    paymentCode: String!
+    paymentDate: String
+    isPaid: Boolean!
+    isPrinted: Boolean!
+    consumerID: ID!
+    recordID: ID!
+    debtID: ID!
+    userID: ID!
+  ): Invoice
+
+  updateInvoice(
+    invoiceID: ID!
+    amount: Float
+    paymentCode: String
+    paymentDate: String
+    isPaid: Boolean
+    isPrinted: Boolean
+  ): Invoice
+
+  deleteInvoice(invoiceID: ID!): Invoice
 }
 
 input updateConsumerInput {
@@ -192,41 +231,50 @@ export const resolvers = {
           },
         );
       }),
-    getInvoice: async (_, { recordID }) => {
-      console.log('==>recordID', recordID);
-      if (!db.open) throw new Error('Database is closed');
-
+    invoices: async () => {
+      return new Promise((resolve, reject) => {
+        db.all('SELECT * FROM invoice', [], (err, rows) => {
+          if (err) reject(err);
+          else
+            resolve(
+              rows.map((invoice) => ({
+                ...invoice,
+                isPaid: Boolean(invoice.isPaid), // Convert 0/1 to true/false
+                isPrinted: Boolean(invoice.isPrinted), // Convert 0/1 to true/false
+              })),
+            );
+        });
+      });
+    },
+    invoice: async (_, { invoiceID }) => {
       return new Promise((resolve, reject) => {
         db.get(
-          `SELECT r.*, s.m3Price, s.village 
-             FROM record r 
-             JOIN settings s ON 1=1 
-             WHERE r.recordID = ?`,
-          [recordID],
+          'SELECT * FROM invoice WHERE invoiceID = ?',
+          [invoiceID],
           (err, row) => {
-            if (err) return reject(err);
-            if (!row) return reject(new Error('Record not found'));
-
-            const consumption = row.newRecord - row.oldRecord;
-            const totalAmount = consumption * parseFloat(row.m3Price);
-
-            resolve({
-              recordID: row.recordID,
-              consumerID: row.consumerID,
-              counterID: row.counterID,
-              period: row.period,
-              recordDate: row.recordDate,
-              oldRecord: row.oldRecord,
-              newRecord: row.newRecord,
-              consumption,
-              totalAmount,
-              m3Price: parseFloat(row.m3Price),
-              village: row.village,
-            });
+            if (err) reject(err);
+            else {
+              // Convert numeric 0/1 to Boolean true/false
+              if (row) {
+                row.isPaid = Boolean(row.isPaid);
+                row.isPrinted = Boolean(row.isPrinted);
+              }
+              resolve(row);
+            }
           },
         );
       });
     },
+    getSettings: () =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+
+        db.get(`SELECT * FROM settings LIMIT 1`, [], (err, row) => {
+          if (err) return reject(err);
+          if (!row) return reject(new Error('Settings not found'));
+          resolve(row);
+        });
+      }),
   },
 
   Mutation: {
@@ -352,31 +400,44 @@ export const resolvers = {
       });
     },
 
-    addRecord: (_, { newRecord, counterID, consumerID, userID = 1 }) =>
+    addRecord: (_, { newRecord, counterID, consumerID, period, userID = 1 }) =>
       new Promise((resolve, reject) => {
+        console.log('==> counterID', counterID);
         if (!db.open) return reject(new Error('Database is closed'));
 
-        const period = 'Jan-March';
-
+        // Get the last record for the given consumerID
         db.get(
-          `SELECT * FROM record WHERE period = ? AND consumerID = ?`,
-          [period, consumerID],
-          (err, row) => {
+          `SELECT * FROM record WHERE consumerID = ? ORDER BY recordDate DESC LIMIT 1`,
+          [consumerID],
+          (err, lastRecord) => {
             if (err) return reject(err);
 
-            const isUpdating = !!row;
-            const recordID = isUpdating ? row.recordID : uuid();
-            const oldRecord = isUpdating ? row.newRecord : 400; // Use the last newRecord as oldRecord
-            const createdAt = isUpdating
-              ? row.createdAt
-              : new Date().toISOString();
-            const updatedAt = new Date().toISOString();
+            let isUpdating = false;
+            let oldRecord = 0;
 
-            // **Check if newRecord is greater than oldRecord**
-            if (newRecord <= oldRecord) {
-              return reject(new Error(`INVALID_RECORD`));
+            if (lastRecord) {
+              oldRecord = lastRecord.newRecord;
+
+              if (lastRecord.period === period) {
+                // If the period is the same, update the record if newRecord is greater
+                if (newRecord > oldRecord) {
+                  isUpdating = true;
+                } else {
+                  return reject(
+                    new Error(
+                      `INVALID_RECORD: New record must be greater than the last record for the same consumer.`,
+                    ),
+                  );
+                }
+              }
             }
 
+            // Prepare new record data
+            const recordID = isUpdating ? lastRecord.recordID : uuid();
+            const createdAt = isUpdating
+              ? lastRecord.createdAt
+              : new Date().toISOString();
+            const updatedAt = new Date().toISOString();
             const recordDate = moment().toISOString();
             const nextRecordDate = moment(recordDate)
               .add(3, 'months')
@@ -396,14 +457,16 @@ export const resolvers = {
               userID,
             };
 
+            console.log('==> newRecordObj', newRecordObj);
+
             const query = isUpdating
               ? `UPDATE record 
-                 SET recordDate = ?, nextRecordDate = ?, oldRecord = ?, 
-                     newRecord = ?, updatedAt = ?, counterID = ?, consumerID = ?, userID = ? 
-                 WHERE recordID = ?`
+                   SET recordDate = ?, nextRecordDate = ?, oldRecord = ?, 
+                       newRecord = ?, updatedAt = ?, counterID = ?, consumerID = ?, userID = ? 
+                   WHERE recordID = ?`
               : `INSERT INTO record 
-                 (recordID, period, recordDate, nextRecordDate, oldRecord, newRecord, createdAt, updatedAt, counterID, consumerID, userID) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                   (recordID, period, recordDate, nextRecordDate, oldRecord, newRecord, createdAt, updatedAt, counterID, consumerID, userID) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
             const params = isUpdating
               ? [
@@ -422,6 +485,7 @@ export const resolvers = {
             db.run(query, params, function (err) {
               if (err) return reject(err);
 
+              // Fetch settings after successfully inserting/updating the record
               db.get(
                 `SELECT m3price FROM settings LIMIT 1`,
                 [],
@@ -440,8 +504,8 @@ export const resolvers = {
 
                   db.run(
                     `INSERT INTO invoice 
-                   (invoiceID, amount, paymentCode, paymentDate, isPaid, isPrinted, createdAt, updatedAt, consumerID, debtID, recordID, userID) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                     (invoiceID, amount, paymentCode, paymentDate, isPaid, isPrinted, createdAt, updatedAt, consumerID, debtID, recordID, userID) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                       invoiceID,
                       totalAmount.toFixed(2),
@@ -467,6 +531,84 @@ export const resolvers = {
           },
         );
       }),
+
+    updateInvoice: async (
+      _,
+      { invoiceID, amount, paymentCode, paymentDate, isPaid, isPrinted },
+    ) => {
+      const updatedAt = new Date().toISOString();
+
+      return new Promise((resolve, reject) => {
+        db.run(
+          `UPDATE invoice SET 
+                amount = COALESCE(?, amount), 
+                paymentCode = COALESCE(?, paymentCode), 
+                paymentDate = COALESCE(?, paymentDate), 
+                isPaid = COALESCE(?, isPaid), 
+                isPrinted = COALESCE(?, isPrinted), 
+                updatedAt = ? 
+              WHERE invoiceID = ?`,
+          [
+            amount,
+            paymentCode,
+            paymentDate,
+            isPaid,
+            isPrinted,
+            updatedAt,
+            invoiceID,
+          ],
+          function (err) {
+            if (err) reject(err);
+            else {
+              db.get(
+                'SELECT * FROM invoice WHERE invoiceID = ?',
+                [invoiceID],
+                (err, row) => {
+                  if (err) reject(err);
+                  else resolve(row);
+                },
+              );
+            }
+          },
+        );
+      });
+    },
+    deleteInvoice: async (_, { invoiceID }) => {
+      return new Promise((resolve, reject) => {
+        db.get(
+          'SELECT * FROM invoice WHERE invoiceID = ?',
+          [invoiceID],
+          (err, invoice) => {
+            if (err) {
+              reject(err);
+            } else if (!invoice) {
+              reject(new Error('Invoice not found'));
+            } else {
+              // Step 1: Delete the related record first
+              db.run(
+                'DELETE FROM record WHERE recordID = ?',
+                [invoice.recordID],
+                function (err) {
+                  if (err) {
+                    reject(err);
+                  } else {
+                    // Step 2: Delete the invoice
+                    db.run(
+                      'DELETE FROM invoice WHERE invoiceID = ?',
+                      [invoiceID],
+                      function (err) {
+                        if (err) reject(err);
+                        else resolve(invoice); // Return the deleted invoice
+                      },
+                    );
+                  }
+                },
+              );
+            }
+          },
+        );
+      });
+    },
 
     deleteConsumers: (_, { consumerIDs }) =>
       new Promise((resolve, reject) => {
@@ -547,6 +689,77 @@ export const resolvers = {
           (err, rows) => {
             if (err) reject(err);
             resolve(rows);
+          },
+        );
+      });
+    },
+  },
+  Invoice: {
+    consumer: ({ consumerID }) => {
+      return new Promise((resolve, reject) => {
+        db.get(
+          'SELECT * FROM consumer WHERE consumerID = ?',
+          [consumerID],
+          (err, row) => {
+            if (err) reject(err);
+            resolve(row);
+          },
+        );
+      });
+    },
+
+    debt: ({ debtID }) => {
+      return new Promise((resolve, reject) => {
+        db.get('SELECT * FROM debt WHERE debtID = ?', [debtID], (err, row) => {
+          if (err) reject(err);
+          resolve(row);
+        });
+      });
+    },
+
+    record: ({ recordID }) => {
+      return new Promise((resolve, reject) => {
+        db.get(
+          'SELECT * FROM record WHERE recordID = ?',
+          [recordID],
+          (err, row) => {
+            if (err) reject(err);
+            resolve(row);
+          },
+        );
+      });
+    },
+
+    user: ({ userID }) => {
+      return new Promise((resolve, reject) => {
+        db.get('SELECT * FROM user WHERE userID = ?', [userID], (err, row) => {
+          if (err) reject(err);
+          resolve(row);
+        });
+      });
+    },
+    counter: ({ recordID }) => {
+      return new Promise((resolve, reject) => {
+        db.get(
+          'SELECT counter.* FROM counter INNER JOIN record ON counter.counterID = record.counterID WHERE record.recordID = ?',
+          [recordID],
+          (err, row) => {
+            if (err) reject(err);
+            resolve(row);
+          },
+        );
+      });
+    },
+  },
+  Record: {
+    counter: ({ counterID }) => {
+      return new Promise((resolve, reject) => {
+        db.get(
+          'SELECT * FROM counter WHERE counterID = ?',
+          [counterID],
+          (err, row) => {
+            if (err) reject(err);
+            resolve(row);
           },
         );
       });

@@ -41,6 +41,7 @@ function AddRecord() {
       .matches(/^\d+$/, 'Veuillez entrer un nombre valide') // ✅ Accepte uniquement les chiffres
       .required('Recensement requis'),
     consumerID: yup.string().required('Consommateur requis'),
+    counterID: yup.string().required('CounterID requis'),
     period: yup.string().required('Periode requise'),
   });
 
@@ -55,7 +56,7 @@ function AddRecord() {
         enqueueSnackbar('Duplication détectée', { variant: 'warning' });
       }
       if (err.message.includes('INVALID_RECORD')) {
-        enqueueSnackbar('Recensement incorrecte', { variant: 'error' });
+        enqueueSnackbar('Recensement incorrecte: valeur inférieur', { variant: 'error' });
       } else {
         enqueueSnackbar('Une erreur est survenue', { variant: 'error' });
       }

@@ -73,7 +73,14 @@ export const addSettings = gql`
     }
   }
 `;
-
+export const getSettings = gql`
+  query getSettings {
+    getSettings {
+      m3price
+      village
+    }
+  }
+`;
 export const deleteConsumers = gql`
   mutation ($consumerId: [String!]!) {
     deleteConsumers(consumerIDs: $consumerId) {
@@ -111,11 +118,75 @@ export const GET_RECORD = gql`
   }
 `;
 
-export const GET_SETTINGS = gql`
-  query GetSettings {
-    settings {
-      m3Price
-      village
+export const GET_INVOICES = gql`
+  query GetInvoices {
+    invoices {
+      invoiceID
+      createdAt
+      amount
+      consumer {
+        consumerID
+        fullName
+      }
+      record {
+        period
+        recordDate
+        nextRecordDate
+        oldRecord
+        newRecord
+      }
+      counter {
+        counterID
+        status
+      }
+    }
+  }
+`;
+
+export const DELETE_INVOICE = gql`
+  mutation DeleteInvoice($invoiceID: ID!) {
+    deleteInvoice(invoiceID: $invoiceID) {
+      invoiceID
+    }
+  }
+`;
+export const UPDATE_INVOICE = gql`
+  mutation UpdateInvoice(
+    $invoiceID: ID!
+    $amount: String!
+    $paymentCode: String!
+    $paymentDate: String
+    $isPaid: Boolean!
+    $isPrinted: Boolean!
+  ) {
+    updateInvoice(
+      invoiceID: $invoiceID
+      amount: $amount
+      paymentCode: $paymentCode
+      paymentDate: $paymentDate
+      isPaid: $isPaid
+      isPrinted: $isPrinted
+    ) {
+      invoiceID
+      amount
+      paymentCode
+      paymentDate
+      isPaid
+      isPrinted
+      updatedAt
+    }
+  }
+`;
+export const GET_INVOICE = gql`
+  query GetInvoice($invoiceID: ID!) {
+    invoice(invoiceID: $invoiceID) {
+      invoiceID
+      amount
+      paymentCode
+      paymentDate
+      isPaid
+      isPrinted
+      createdAt
     }
   }
 `;

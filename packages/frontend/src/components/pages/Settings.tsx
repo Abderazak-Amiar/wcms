@@ -1,31 +1,34 @@
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { Button, TextField, Typography } from '@mui/material';
 import { useFormik } from 'formik';
 import { enqueueSnackbar } from 'notistack';
 import * as yup from 'yup';
-import { addSettings } from '../../api/apollo';
+import { addSettings, getSettings } from '../../api/apollo';
 
 // Define Settings Type
 type SettingsFormValues = {
-  m3Price: string;
+  m3price: string;
   village: string;
 };
 
 function AddSettings() {
+  // Fetch existing settings
+  const { data, loading: loadingSettings } = useQuery(getSettings);
+  // Set initial values based on fetched data or fallback to defaults
   const initialValues: SettingsFormValues = {
-    m3Price: '',
-    village: '',
+    m3price: data?.getSettings?.m3price || '',
+    village: data?.getSettings?.village || '',
   };
 
   const validationSchema = yup.object({
-    m3Price: yup
+    m3price: yup
       .string()
       .matches(/^\d+(\.\d{1,2})?$/, 'Veuillez entrer un prix valide') // ✅ Accepts decimal values
       .required('Prix requis'),
     village: yup.string().required('Village requis'),
   });
 
-  // Mutation for adding settings
+  // Mutation for adding/updating settings
   const [submit, { loading }] = useMutation(addSettings, {
     onCompleted: () => {
       enqueueSnackbar('Paramètres enregistrés avec succès', {
@@ -40,6 +43,7 @@ function AddSettings() {
 
   const formik = useFormik<SettingsFormValues>({
     initialValues,
+    enableReinitialize: true, // ✅ Ensures form updates when `data` changes
     validationSchema,
     onSubmit: (values) => {
       submit({
@@ -50,6 +54,8 @@ function AddSettings() {
     },
   });
 
+  if (loadingSettings) return <p>Chargement des paramètres...</p>;
+
   return (
     <div className="login-form-container">
       <form onSubmit={formik.handleSubmit} className="login-form">
@@ -59,15 +65,22 @@ function AddSettings() {
 
         <TextField
           fullWidth
-          id="m3Price"
-          name="m3Price"
+          id="m3price"
+          name="m3price"
           label="Prix par M³"
-          value={formik.values.m3Price}
+          value={formik.values.m3price}
           onChange={formik.handleChange}
           onBlur={formik.handleBlur}
-          error={formik.touched.m3Price && Boolean(formik.errors.m3Price)}
-          helperText={formik.touched.m3Price && formik.errors.m3Price}
-          sx={{ marginBlock: '8px' }}
+          error={formik.touched.m3price && Boolean(formik.errors.m3price)}
+          helperText={formik.touched.m3price && formik.errors.m3price}
+          sx={{
+            marginBlock: '8px',
+
+            '& .MuiInputBase-input': {
+              color: 'rgba(0, 0, 0, 0.4)', // Change text color inside the input
+              fontWeight: 'bold',
+            },
+          }}
         />
 
         <TextField
@@ -80,7 +93,14 @@ function AddSettings() {
           onBlur={formik.handleBlur}
           error={formik.touched.village && Boolean(formik.errors.village)}
           helperText={formik.touched.village && formik.errors.village}
-          sx={{ marginBlock: '8px' }}
+          sx={{
+            marginBlock: '8px',
+
+            '& .MuiInputBase-input': {
+              color: 'rgba(0, 0, 0, 0.4)', // Change text color inside the input
+              fontWeight: 'bold',
+            },
+          }}
         />
 
         <Button

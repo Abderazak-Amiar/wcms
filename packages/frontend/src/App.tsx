@@ -8,7 +8,7 @@ import ConsumerList from './components/pages/consumer/ConsumerList';
 import Counter from './components/pages/counter/Counter';
 import Debt from './components/pages/Debt';
 import Home from './components/pages/Home';
-import Invoice from './components/pages/Invoice';
+import InvoiceList from './components/pages/invoice/InvoiceList';
 import Login from './components/pages/Login';
 import Payment from './components/pages/Payment';
 import Protected from './components/pages/Protected';
@@ -79,7 +79,7 @@ function App() {
               <Route path="list" element={<ConsumerList />} />
             </Route>
             <Route path="counter" element={<Counter />} />
-            <Route path="invoice" element={<Invoice />} />
+            <Route path="invoice" element={<InvoiceList />} />
             <Route path="payment" element={<Payment />} />
             <Route path="debt" element={<Debt />} />
             <Route path="settings" element={<Settings />} />
