@@ -45,6 +45,10 @@ interface Invoice {
     counterID: string;
     status: string;
   };
+  debt: {
+    isPaid: boolean;
+    amount: string;
+  };
 }
 
 const InvoiceList: React.FC = () => {
@@ -143,7 +147,13 @@ const InvoiceList: React.FC = () => {
                   <TableCell>{item?.consumer?.fullName}</TableCell>
                   <TableCell>{item?.amount}</TableCell>
                   <TableCell>{item?.record?.period}</TableCell>
-                  <TableCell>{item?.isPaid ? 'P' : 'NP'}</TableCell>
+                  <TableCell>
+                    {item?.isPaid && item?.debt?.isPaid
+                      ? 'P'
+                      : item?.isPaid && !item?.debt?.isPaid
+                      ? 'PP'
+                      : 'NP'}
+                  </TableCell>
                   <TableCell>
                     {moment(item?.createdAt).format('DD-MMM-YYYY')}
                   </TableCell>

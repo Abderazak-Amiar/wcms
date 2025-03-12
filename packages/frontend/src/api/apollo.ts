@@ -152,6 +152,10 @@ export const GET_INVOICES = gql`
         counterID
         status
       }
+      debt {
+        isPaid
+        amount
+      }
     }
   }
 `;
@@ -178,6 +182,10 @@ export const GET_INVOICE = gql`
       counter {
         counterID
         status
+      }
+      debt {
+        isPaid
+        amount
       }
     }
   }

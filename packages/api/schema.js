@@ -60,7 +60,7 @@ type Invoice {
   createdAt: String!
   updatedAt: String
   consumerID: ID!
-  debtID: ID!
+  debtID: ID
   recordID: ID!
   userID: ID!
   
@@ -82,6 +82,7 @@ type Debt {
   consumerID: ID!
   userID: ID!
   invoice: Invoice
+  consumer: Consumer
 }
 
 type Payment{
@@ -117,6 +118,7 @@ type Query {
     invoice(invoiceID: ID!): Invoice
     getSettings: Settings
     getDebt(invoiceID: ID!): Debt
+    getDebts(consumerID: ID!): [Debt]
 }
 
 type Mutation {
@@ -291,19 +293,42 @@ export const resolvers = {
           resolve(row);
         });
       }),
-    getDebt: ({ debtID }) => {
+    getDebt: (_, { invoiceID }) => {
       return new Promise((resolve, reject) => {
-        db.get('SELECT * FROM debt WHERE debtID = ?', [debtID], (err, row) => {
-          if (err) {
-            console.error('Error fetching debt:', err);
-            reject(err);
-            return;
-          }
-          if (!row) {
-            console.warn(`No debt found for debtID: ${debtID}`);
-          }
-          resolve(row);
-        });
+        db.get(
+          'SELECT * FROM debt WHERE invoiceID = ?',
+          [invoiceID],
+          (err, row) => {
+            if (err) {
+              console.error('Error fetching debt:', err);
+              reject(err);
+              return;
+            }
+            if (!row) {
+              console.warn(`No debt found for invoice: ${invoiceID}`);
+            }
+            resolve(row);
+          },
+        );
+      });
+    },
+    getDebts: async (_, { consumerID }) => {
+      return new Promise((resolve, reject) => {
+        db.all(
+          'SELECT * FROM debt WHERE consumerID = ?',
+          [consumerID],
+          (err, rows) => {
+            if (err) {
+              console.error('Error fetching debts:', err);
+              reject(err);
+              return;
+            }
+            if (!rows.length) {
+              console.warn(`No debts found for consumer: ${consumerID}`);
+            }
+            resolve(rows);
+          },
+        );
       });
     },
   },
@@ -384,7 +409,7 @@ export const resolvers = {
       }),
     addPayment: (_, { consumerID, invoiceID, paidAmount }) =>
       new Promise((resolve, reject) => {
-        if (!db.open) return reject(new Error('Database is closed'));
+        if (!db) return reject(new Error('Database connection is unavailable'));
 
         db.get(
           `SELECT amount, isPaid, debtID FROM invoice WHERE invoiceID = ?`,
@@ -394,88 +419,121 @@ export const resolvers = {
             if (!invoice) return reject(new Error('Invoice not found'));
 
             const { amount, isPaid, debtID } = invoice;
-            if (isPaid) return reject(new Error('Invoice is already paid'));
 
-            if (paidAmount > amount) {
-              return reject(new Error('Paid amount exceeds the due amount'));
-            }
-
-            const remainingAmount = parseFloat(amount) - parseFloat(paidAmount);
-            const isFullyPaid = remainingAmount === 0;
-            const newDebtID = isFullyPaid ? null : nanoid(); // Create a new debtID if partial payment
-
-            const newPayment = {
-              paymentID: nanoid(),
-              paidAmount: paidAmount.toFixed(2),
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              invoiceID,
-              consumerID,
-              userID: 1,
-            };
-
-            db.run(
-              `INSERT INTO payment (paymentID, paidAmount, createdAt, updatedAt, invoiceID, consumerID, userID) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
-              [
-                newPayment.paymentID,
-                newPayment.paidAmount,
-                newPayment.createdAt,
-                newPayment.updatedAt,
-                newPayment.invoiceID,
-                newPayment.consumerID,
-                newPayment.userID,
-              ],
-              function (err) {
+            // Get total paid amount for the invoice
+            db.get(
+              `SELECT COALESCE(SUM(paidAmount), 0) as totalPaid FROM payment WHERE invoiceID = ?`,
+              [invoiceID],
+              (err, result) => {
                 if (err) return reject(err);
 
-                if (isFullyPaid) {
-                  // Mark invoice as fully paid and remove debt reference
-                  db.run(
-                    `UPDATE invoice SET isPaid = 1, debtID = NULL, updatedAt = ? WHERE invoiceID = ?`,
-                    [new Date().toISOString(), invoiceID],
-                    (err) => {
-                      if (err) return reject(err);
-                      resolve({
-                        ...newPayment,
-                        isFullyPaid: true,
-                        remainingAmount: 0,
-                      });
-                    },
-                  );
-                } else {
-                  // Partial payment: Create new debt and update invoice
-                  db.run(
-                    `INSERT INTO debt (debtID, invoiceID, consumerID, amount, createdAt, userID) 
-                         VALUES (?, ?, ?, ?, ?, ?)`,
-                    [
-                      newDebtID,
-                      invoiceID,
-                      consumerID,
-                      remainingAmount.toFixed(2),
-                      new Date().toISOString(),
-                      1,
-                    ],
-                    (err) => {
-                      if (err) return reject(err);
+                const totalPaid = result?.totalPaid || 0;
+                const newTotalPaid = totalPaid + parseFloat(paidAmount);
 
-                      // Update invoice to link to the new debt record
-                      db.run(
-                        `UPDATE invoice SET debtID = ?, updatedAt = ? WHERE invoiceID = ?`,
-                        [newDebtID, new Date().toISOString(), invoiceID],
-                        (err) => {
-                          if (err) return reject(err);
-                          resolve({
-                            ...newPayment,
-                            remainingAmount,
-                            isFullyPaid: false,
-                            newDebtID,
-                          });
-                        },
-                      );
-                    },
+                if (newTotalPaid > amount) {
+                  return reject(
+                    new Error('Total paid amount exceeds invoice amount'),
                   );
                 }
+
+                const remainingAmount = amount - newTotalPaid;
+                const isFullyPaid = remainingAmount === 0;
+
+                const newPayment = {
+                  paymentID: nanoid(),
+                  paidAmount: paidAmount.toFixed(2),
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  invoiceID,
+                  consumerID,
+                  userID: 1,
+                };
+
+                db.run(
+                  `INSERT INTO payment (paymentID, paidAmount, createdAt, updatedAt, invoiceID, consumerID, userID) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                  [
+                    newPayment.paymentID,
+                    newPayment.paidAmount,
+                    newPayment.createdAt,
+                    newPayment.updatedAt,
+                    newPayment.invoiceID,
+                    newPayment.consumerID,
+                    newPayment.userID,
+                  ],
+                  function (err) {
+                    if (err) return reject(err);
+
+                    // Mark invoice as paid (even for partial payment)
+                    db.run(
+                      `UPDATE invoice SET isPaid = 1, updatedAt = ? WHERE invoiceID = ?`,
+                      [new Date().toISOString(), invoiceID],
+                      (err) => {
+                        if (err) return reject(err);
+
+                        if (debtID) {
+                          // If debt exists, update it instead of creating a new one
+                          db.run(
+                            `UPDATE debt SET amount = ?, isPaid = ?, updatedAt = ? WHERE invoiceID = ?`,
+                            [
+                              remainingAmount.toFixed(2),
+                              isFullyPaid ? 1 : 0,
+                              new Date().toISOString(),
+                              invoiceID,
+                            ],
+                            (err) => {
+                              if (err) return reject(err);
+                              resolve({
+                                ...newPayment,
+                                remainingAmount,
+                                isFullyPaid,
+                                debtID,
+                              });
+                            },
+                          );
+                        } else if (!isFullyPaid) {
+                          // If no debt exists, create it (only on first partial payment)
+                          const newDebtID = nanoid();
+                          db.run(
+                            `INSERT INTO debt (debtID, invoiceID, consumerID, amount, createdAt, userID, isPaid) 
+                                   VALUES (?, ?, ?, ?, ?, ?, 0)`,
+                            [
+                              newDebtID,
+                              invoiceID,
+                              consumerID,
+                              remainingAmount.toFixed(2),
+                              new Date().toISOString(),
+                              1,
+                            ],
+                            (err) => {
+                              if (err) return reject(err);
+                              db.run(
+                                `UPDATE invoice SET debtID = ? WHERE invoiceID = ?`,
+                                [newDebtID, invoiceID],
+                                (err) => {
+                                  if (err) return reject(err);
+                                  resolve({
+                                    ...newPayment,
+                                    remainingAmount,
+                                    isFullyPaid: false,
+                                    debtID: newDebtID,
+                                  });
+                                },
+                              );
+                            },
+                          );
+                        } else {
+                          // Fully paid, no debt update needed
+                          resolve({
+                            ...newPayment,
+                            remainingAmount: 0,
+                            isFullyPaid: true,
+                          });
+                        }
+                      },
+                    );
+                  },
+                );
               },
             );
           },
@@ -895,6 +953,25 @@ export const resolvers = {
             }
             if (!row) {
               console.warn(`No invoice found for invoiceID: ${invoiceID}`);
+            }
+            resolve(row);
+          },
+        );
+      });
+    },
+    consumer: ({ consumerID }) => {
+      return new Promise((resolve, reject) => {
+        db.get(
+          'SELECT * FROM consumer WHERE consumerID = ?',
+          [consumerID],
+          (err, row) => {
+            if (err) {
+              console.error('Error fetching consumerID:', err);
+              reject(err);
+              return;
+            }
+            if (!row) {
+              console.warn(`No invoice found for consumer: ${consumerID}`);
             }
             resolve(row);
           },

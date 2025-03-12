@@ -48,7 +48,7 @@ function AddRecord() {
   // Mutation pour ajouter un enregistrement
   const [submit, { loading }] = useMutation(addRecord, {
     onCompleted: (res) => {
-      enqueueSnackbar('Recensement fait avec succès', { variant: 'success' });
+      enqueueSnackbar('Paiement fait avec succès', { variant: 'success' });
     },
     onError: (err) => {
       console.error('==> error', err);
