@@ -70,13 +70,14 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
               <Grid item xs={6}>
                 <Paper sx={{ p: 2 }}>
                   <Typography>
-                    <strong>Numéro de Facture :</strong> {invoice.invoiceID}
+                    <strong>Code Facture :</strong>{' '}
+                    {invoice.invoiceID.substring(0, 8)}
                   </Typography>
                   <Typography>
                     <strong>Période :</strong> {invoice.record?.period ?? 'N/A'}
                   </Typography>
                   <Typography>
-                    <strong>Date de Facturation :</strong>{' '}
+                    <strong>Date Facturation :</strong>{' '}
                     {formatDate(invoice.createdAt)}
                   </Typography>
                 </Paper>
@@ -85,20 +86,20 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
               <Grid item xs={6}>
                 <Paper sx={{ p: 2 }}>
                   <Typography>
-                    <strong>Date du Relevé :</strong>{' '}
+                    <strong>Date Relevé :</strong>{' '}
                     {formatDate(invoice.record?.recordDate)}
                   </Typography>
                   <Typography>
-                    <strong>Date du Prochain Relevé :</strong>{' '}
+                    <strong>Prochain Relevé :</strong>{' '}
                     {formatDate(invoice.record?.nextRecordDate)}
                   </Typography>
                   <Typography>
                     <strong>Ancien Relevé :</strong>{' '}
-                    {invoice.record?.oldRecord ?? 'N/A'}
+                    {invoice.record?.oldRecord ?? 'N/A'} m³
                   </Typography>
                   <Typography>
                     <strong>Nouveau Relevé :</strong>{' '}
-                    {invoice.record?.newRecord ?? 'N/A'}
+                    {invoice.record?.newRecord ?? 'N/A'} m³
                   </Typography>
                 </Paper>
               </Grid>
@@ -111,11 +112,11 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
               <Grid item xs={6}>
                 <Paper sx={{ p: 2 }}>
                   <Typography>
-                    <strong>ID du Consommateur :</strong>{' '}
-                    {invoice.consumer?.consumerID ?? 'N/A'}
+                    <strong>Code Consommateur :</strong>{' '}
+                    {invoice.consumer?.consumerID.substring(0, 8) ?? 'N/A'}
                   </Typography>
                   <Typography>
-                    <strong>Nom du Consommateur :</strong>{' '}
+                    <strong>Consommateur :</strong>{' '}
                     {invoice.consumer?.fullName ?? 'N/A'}
                   </Typography>
                 </Paper>
@@ -124,7 +125,7 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
               <Grid item xs={6}>
                 <Paper sx={{ p: 2 }}>
                   <Typography>
-                    <strong>ID du Compteur :</strong>{' '}
+                    <strong>Code Compteur :</strong>{' '}
                     {invoice?.counter?.counterID ?? 'N/A'}
                   </Typography>
                   <Typography>
@@ -156,10 +157,10 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                 <TableBody>
                   <TableRow>
                     <TableCell align="center">{quantityConsumed}</TableCell>
-                    <TableCell align="right">X.XX €</TableCell>{' '}
+                    <TableCell align="right">X.XX</TableCell>{' '}
                     {/* Remplace par le prix réel */}
                     <TableCell align="right">
-                      {Number(invoice.amount ?? 0).toFixed(2)} €
+                      {Number(invoice.amount ?? 0).toFixed(2)}
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -169,7 +170,7 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
             {/* Montant Total */}
             <Typography variant="h6" align="right" sx={{ mt: 2 }}>
               <strong>Montant Total :</strong>{' '}
-              {Number(invoice.amount ?? 0).toFixed(2)} €
+              {Number(invoice.amount ?? 0).toFixed(2)} DA
             </Typography>
 
             {/* Bouton d'impression (Caché en mode impression) */}

@@ -1,6 +1,8 @@
 import moment from 'moment';
-import { v4 as uuid } from 'uuid';
+import { customAlphabet } from 'nanoid';
 import { db } from './db.js';
+const nanoid = customAlphabet('1234567890abcdef', 8);
+
 export const typeDefs = `#graphql
 type User {
     userID: ID!
@@ -79,12 +81,23 @@ type Debt {
   invoiceID: ID!
   consumerID: ID!
   userID: ID!
+  invoice: Invoice
+}
+
+type Payment{
+  paymentID: ID!
+  paidAmount: Float!
+  createdAt: String!
+  updatedAt: String!
+  invoiceID: ID!
+  consumerID: ID!
+  userID: ID!
 }
 
 type Settings {
-  m3price: String
+  m3price: Float
   village: String
-  createdAt: String!
+  createdAt: String
   updatedAt: String
 }
 type ResponseMessage {
@@ -103,16 +116,18 @@ type Query {
     invoices: [Invoice!]!
     invoice(invoiceID: ID!): Invoice
     getSettings: Settings
+    getDebt(invoiceID: ID!): Debt
 }
 
 type Mutation {
     addConsumer(fullName: String!): Consumer!
+    addPayment(consumerID: ID!, invoiceID:String!, paidAmount:Float!): Payment!
     addRecord(newRecord: String!, counterID: ID!, consumerID: ID!, period:String!): Record!
     addCounter(counterID: ID!, consumerID: ID!, price: String!): Counter!
     updateConsumer(consumerID: ID!, edits: updateConsumerInput!): Consumer
     deleteConsumers(consumerIDs: [ID!]!): [Consumer]
     deleteCounters(counterIDs: [ID!]!): [Counter]
-    addSettings(m3Price: String!, village: String!): Settings!
+    addSettings(m3price: String!, village: String!): Settings!
     updateSettings(m3Price: String!, village: String!): Settings!
     createInvoice(
     amount: Float!
@@ -183,6 +198,7 @@ export const resolvers = {
                 reject();
               }
               resolve(row);
+              console.log('==>row', row);
             },
           );
         });
@@ -275,10 +291,25 @@ export const resolvers = {
           resolve(row);
         });
       }),
+    getDebt: ({ debtID }) => {
+      return new Promise((resolve, reject) => {
+        db.get('SELECT * FROM debt WHERE debtID = ?', [debtID], (err, row) => {
+          if (err) {
+            console.error('Error fetching debt:', err);
+            reject(err);
+            return;
+          }
+          if (!row) {
+            console.warn(`No debt found for debtID: ${debtID}`);
+          }
+          resolve(row);
+        });
+      });
+    },
   },
 
   Mutation: {
-    addSettings: (_, { m3Price, village }) =>
+    addSettings: (_, { m3price, village }) =>
       new Promise((resolve, reject) => {
         if (!db.open) return reject(new Error('Database is closed'));
 
@@ -290,12 +321,12 @@ export const resolvers = {
           if (row) {
             // Update existing settings
             db.run(
-              `UPDATE settings SET m3Price = ?, village = ?, updatedAt = ? WHERE rowid = (SELECT rowid FROM settings LIMIT 1)`,
-              [m3Price, village, updatedAt],
+              `UPDATE settings SET m3price = ?, village = ?, updatedAt = ? WHERE rowid = (SELECT rowid FROM settings LIMIT 1)`,
+              [m3price, village, updatedAt],
               function (err) {
                 if (err) reject(err);
                 resolve({
-                  m3Price,
+                  m3price,
                   village,
                   createdAt: row.createdAt, // Ensure createdAt is returned
                   updatedAt,
@@ -307,10 +338,10 @@ export const resolvers = {
             const createdAt = new Date().toISOString();
             db.run(
               `INSERT INTO settings (m3Price, village, createdAt) VALUES (?, ?, ?)`,
-              [m3Price, village, createdAt],
+              [m3price, village, createdAt],
               function (err) {
                 if (err) reject(err);
-                resolve({ m3Price, village, createdAt, updatedAt: null });
+                resolve({ m3price, village, createdAt, updatedAt: null });
               },
             );
           }
@@ -322,7 +353,7 @@ export const resolvers = {
         if (!db.open) return reject(new Error('Database is closed'));
 
         const newConsumer = {
-          consumerID: uuid(),
+          consumerID: nanoid(),
           fullName: fullName.trim(),
           createdAt: new Date().toISOString(),
           userID: '1',
@@ -351,6 +382,105 @@ export const resolvers = {
           },
         );
       }),
+    addPayment: (_, { consumerID, invoiceID, paidAmount }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+
+        db.get(
+          `SELECT amount, isPaid, debtID FROM invoice WHERE invoiceID = ?`,
+          [invoiceID],
+          (err, invoice) => {
+            if (err) return reject(err);
+            if (!invoice) return reject(new Error('Invoice not found'));
+
+            const { amount, isPaid, debtID } = invoice;
+            if (isPaid) return reject(new Error('Invoice is already paid'));
+
+            if (paidAmount > amount) {
+              return reject(new Error('Paid amount exceeds the due amount'));
+            }
+
+            const remainingAmount = parseFloat(amount) - parseFloat(paidAmount);
+            const isFullyPaid = remainingAmount === 0;
+            const newDebtID = isFullyPaid ? null : nanoid(); // Create a new debtID if partial payment
+
+            const newPayment = {
+              paymentID: nanoid(),
+              paidAmount: paidAmount.toFixed(2),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              invoiceID,
+              consumerID,
+              userID: 1,
+            };
+
+            db.run(
+              `INSERT INTO payment (paymentID, paidAmount, createdAt, updatedAt, invoiceID, consumerID, userID) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [
+                newPayment.paymentID,
+                newPayment.paidAmount,
+                newPayment.createdAt,
+                newPayment.updatedAt,
+                newPayment.invoiceID,
+                newPayment.consumerID,
+                newPayment.userID,
+              ],
+              function (err) {
+                if (err) return reject(err);
+
+                if (isFullyPaid) {
+                  // Mark invoice as fully paid and remove debt reference
+                  db.run(
+                    `UPDATE invoice SET isPaid = 1, debtID = NULL, updatedAt = ? WHERE invoiceID = ?`,
+                    [new Date().toISOString(), invoiceID],
+                    (err) => {
+                      if (err) return reject(err);
+                      resolve({
+                        ...newPayment,
+                        isFullyPaid: true,
+                        remainingAmount: 0,
+                      });
+                    },
+                  );
+                } else {
+                  // Partial payment: Create new debt and update invoice
+                  db.run(
+                    `INSERT INTO debt (debtID, invoiceID, consumerID, amount, createdAt, userID) 
+                         VALUES (?, ?, ?, ?, ?, ?)`,
+                    [
+                      newDebtID,
+                      invoiceID,
+                      consumerID,
+                      remainingAmount.toFixed(2),
+                      new Date().toISOString(),
+                      1,
+                    ],
+                    (err) => {
+                      if (err) return reject(err);
+
+                      // Update invoice to link to the new debt record
+                      db.run(
+                        `UPDATE invoice SET debtID = ?, updatedAt = ? WHERE invoiceID = ?`,
+                        [newDebtID, new Date().toISOString(), invoiceID],
+                        (err) => {
+                          if (err) return reject(err);
+                          resolve({
+                            ...newPayment,
+                            remainingAmount,
+                            isFullyPaid: false,
+                            newDebtID,
+                          });
+                        },
+                      );
+                    },
+                  );
+                }
+              },
+            );
+          },
+        );
+      }),
 
     addCounter(_, args) {
       console.log('==>args', args);
@@ -360,7 +490,7 @@ export const resolvers = {
           `SELECT status FROM counter WHERE consumerID = ?`,
           [args.consumerID],
           (err, row) => {
-            if (err) return reject(err);
+            if (err) return reject({ message: 'Azul' });
 
             if (row) {
               if (row.status === 'En Marche') {
@@ -433,7 +563,7 @@ export const resolvers = {
             }
 
             // Prepare new record data
-            const recordID = isUpdating ? lastRecord.recordID : uuid();
+            const recordID = isUpdating ? lastRecord.recordID : nanoid();
             const createdAt = isUpdating
               ? lastRecord.createdAt
               : new Date().toISOString();
@@ -498,8 +628,8 @@ export const resolvers = {
                     newRecordObj.newRecord - newRecordObj.oldRecord;
                   const totalAmount =
                     consumption * parseFloat(settingsRow.m3price);
-                  const invoiceID = uuid();
-                  const debtID = uuid();
+                  const invoiceID = nanoid();
+                  const debtID = null;
                   const paymentCode = `INV-${invoiceID.slice(0, 8)}`;
 
                   db.run(
@@ -751,6 +881,28 @@ export const resolvers = {
       });
     },
   },
+  Debt: {
+    invoice: ({ invoiceID }) => {
+      return new Promise((resolve, reject) => {
+        db.get(
+          'SELECT * FROM invoice WHERE invoiceID = ?',
+          [invoiceID],
+          (err, row) => {
+            if (err) {
+              console.error('Error fetching invoice:', err);
+              reject(err);
+              return;
+            }
+            if (!row) {
+              console.warn(`No invoice found for invoiceID: ${invoiceID}`);
+            }
+            resolve(row);
+          },
+        );
+      });
+    },
+  },
+
   Record: {
     counter: ({ counterID }) => {
       return new Promise((resolve, reject) => {

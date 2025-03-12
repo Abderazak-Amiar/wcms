@@ -4,7 +4,7 @@ import { useFormik } from 'formik';
 import { enqueueSnackbar } from 'notistack';
 import { useEffect, useState } from 'react';
 import * as yup from 'yup';
-import { addCounter, getConsumers, getCounters } from '../../../api/apollo';
+import { addCounter, getConsumers } from '../../../api/apollo';
 
 // Define the types for the consumer and form values
 type Consumer = {
@@ -45,22 +45,25 @@ function AddCounter() {
     setCounter(formik.values);
   }, [formik.values]);
 
-  const { refetch } = useQuery(getCounters);
-
   const [submit, { loading, error, data }] = useMutation(addCounter, {
     onCompleted: (res) => {
       console.log('==>onCompleted', res);
       enqueueSnackbar('Compteur ajouté', { variant: 'success' });
-      refetch();
     },
     onError: (err) => {
-      console.log('==>error', err);
+      console.log('==>error', err.message);
       if (err.message.includes('ACTIVE_COUNTER_EXISTS')) {
         enqueueSnackbar('Possède un compteur en marche', {
           variant: 'warning',
         });
       } else if (err.message.includes('DUPLICATE_COUNTER_ID')) {
         enqueueSnackbar('Compteur existe', { variant: 'warning' });
+      } else if (
+        err.message.includes(
+          'SQLITE_CONSTRAINT: UNIQUE constraint failed: counter.counterID',
+        )
+      ) {
+        enqueueSnackbar('Compteur Attribué', { variant: 'warning' });
       } else {
         enqueueSnackbar('Une erreur est survenue', { variant: 'error' });
       }
@@ -68,21 +71,17 @@ function AddCounter() {
   });
 
   const {
+    refetch,
     loading: queryLoading,
     error: queryError,
     data: consumersData,
   } = useQuery<{ consumers: Consumer[] }>(getConsumers);
-
+  refetch();
   if (queryLoading) console.log('==>loading', queryLoading);
   if (queryError) console.log('==>error', queryError);
 
   // Fallback data for consumers in case of an empty response
   const consumers = consumersData?.consumers ?? [];
-
-  // Handling the selected consumer's ID
-  const [selectedConsumerID, setSelectedConsumerID] = useState<string | null>(
-    null,
-  );
 
   return (
     <div className="login-form-container">

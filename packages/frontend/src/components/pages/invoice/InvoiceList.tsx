@@ -19,7 +19,8 @@ import {
   TablePagination,
   TableRow,
 } from '@mui/material';
-import React, { useState } from 'react';
+import moment from 'moment';
+import React, { useCallback, useEffect, useState } from 'react';
 import { DELETE_INVOICE, GET_INVOICES } from '../../../api/apollo';
 import InvoiceDetailsModal from './InvoiceDetailsModal';
 
@@ -27,6 +28,8 @@ interface Invoice {
   invoiceID: string;
   createdAt: string;
   amount: number;
+  isPaid: boolean;
+  isPrinted: boolean;
   consumer: {
     consumerID: string;
     fullName: string;
@@ -46,7 +49,7 @@ interface Invoice {
 
 const InvoiceList: React.FC = () => {
   // Fetch invoices
-  const { loading, error, data } = useQuery<{ invoices: Invoice[] }>(
+  const { refetch, loading, error, data } = useQuery<{ invoices: Invoice[] }>(
     GET_INVOICES,
   );
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -99,6 +102,13 @@ const InvoiceList: React.FC = () => {
     }
   };
 
+  const stableRefetch = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  useEffect(() => {
+    stableRefetch();
+  }, [stableRefetch]); // ✅ No ESLint warning
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error: {error.message}</p>;
 
@@ -112,6 +122,8 @@ const InvoiceList: React.FC = () => {
               <TableCell>N° Facture</TableCell>
               <TableCell>Consomateur</TableCell>
               <TableCell>Montant</TableCell>
+              <TableCell>Période</TableCell>
+              <TableCell>Status</TableCell>
               <TableCell>Date</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
@@ -120,25 +132,29 @@ const InvoiceList: React.FC = () => {
             {data?.invoices
               ?.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((item) => (
-                <TableRow key={item.invoiceID}>
+                <TableRow key={item?.invoiceID}>
                   <TableCell>
                     <Checkbox
-                      checked={selected.includes(item.invoiceID)}
-                      onChange={() => handleSelect(item.invoiceID)}
+                      checked={selected.includes(item?.invoiceID)}
+                      onChange={() => handleSelect(item?.invoiceID)}
                     />
                   </TableCell>
-                  <TableCell>{item.invoiceID.substring(0, 8)}</TableCell>
-                  <TableCell>{item.consumer.fullName}</TableCell>
-                  <TableCell>{item.amount}</TableCell>
-                  <TableCell>{item.createdAt}</TableCell>
+                  <TableCell>{item?.invoiceID.substring(0, 8)}</TableCell>
+                  <TableCell>{item?.consumer?.fullName}</TableCell>
+                  <TableCell>{item?.amount}</TableCell>
+                  <TableCell>{item?.record?.period}</TableCell>
+                  <TableCell>{item?.isPaid ? 'P' : 'NP'}</TableCell>
+                  <TableCell>
+                    {moment(item?.createdAt).format('DD-MMM-YYYY')}
+                  </TableCell>
                   <TableCell>
                     <IconButton
-                      onClick={() => setSelectedInvoice(item.invoiceID)}
+                      onClick={() => setSelectedInvoice(item?.invoiceID)}
                     >
                       <VisibilityIcon />
                     </IconButton>
                     <IconButton
-                      onClick={() => handleDeleteConfirm(item.invoiceID)}
+                      onClick={() => handleDeleteConfirm(item?.invoiceID)}
                     >
                       <DeleteIcon />
                     </IconButton>

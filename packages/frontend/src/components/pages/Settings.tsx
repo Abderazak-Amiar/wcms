@@ -46,6 +46,7 @@ function AddSettings() {
     enableReinitialize: true, // ✅ Ensures form updates when `data` changes
     validationSchema,
     onSubmit: (values) => {
+      console.log('==>values',values);
       submit({
         variables: {
           ...values,

@@ -12,7 +12,7 @@ import InvoiceList from './components/pages/invoice/InvoiceList';
 import Login from './components/pages/Login';
 import Payment from './components/pages/Payment';
 import Protected from './components/pages/Protected';
-import Record from './components/pages/record/Record';
+import AddRecord from './components/pages/record/AddRecord';
 import Settings from './components/pages/Settings';
 import isAuthenticated from './helpers';
 const theme = createTheme({
@@ -73,7 +73,7 @@ function App() {
         />
         <Route element={<Protected />}>
           <Route path="/home" element={<Home />}>
-            <Route path="record" element={<Record />} />
+            <Route path="record" element={<AddRecord />} />
             <Route path="consumer" element={<Consumer />}>
               <Route path="add" element={<AddConsumer />} />
               <Route path="list" element={<ConsumerList />} />

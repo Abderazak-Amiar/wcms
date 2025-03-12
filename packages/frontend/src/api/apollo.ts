@@ -65,11 +65,10 @@ export const addRecord = gql`
   }
 `;
 export const addSettings = gql`
-  mutation ($m3Price: String!, $village: String!) {
-    addSettings(m3Price: $m3Price, village: $village) {
-      m3Price
+  mutation ($m3price: String!, $village: String!) {
+    addSettings(m3price: $m3price, village: $village) {
+      m3price
       village
-      createdAt
     }
   }
 `;
@@ -103,6 +102,17 @@ export const addCounter = gql`
     }
   }
 `;
+export const addPayment = gql`
+  mutation ($consumerID: ID!, $invoiceID: String!, $paidAmount: Float!) {
+    addPayment(
+      consumerID: $consumerID
+      invoiceID: $invoiceID
+      paidAmount: $paidAmount
+    ) {
+      paymentID
+    }
+  }
+`;
 export const GET_RECORD = gql`
   query GetRecord($recordID: ID!) {
     record(recordID: $recordID) {
@@ -126,6 +136,7 @@ export const GET_INVOICES = gql`
       amount
       isPaid
       isPrinted
+      paymentCode
       consumer {
         consumerID
         fullName
@@ -152,6 +163,7 @@ export const GET_INVOICE = gql`
       amount
       isPaid
       isPrinted
+      paymentCode
       consumer {
         consumerID
         fullName
