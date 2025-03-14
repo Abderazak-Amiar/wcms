@@ -46,7 +46,16 @@ function Home() {
   ];
   const theme = useTheme();
   return (
-    <Grid container>
+    <Grid
+      container
+      sx={{
+        display: 'flex',
+        alignItems: 'start',
+        justifyContent: 'center',
+        height: '100vh',
+        background: 'linear-gradient(135deg, #f5f7fa, #c3cfe2)',
+      }}
+    >
       <Grid size={2} spacing={1}>
         <Paper sx={{ height: '100vh' }}>
           {menuFr.map((item, index) => (

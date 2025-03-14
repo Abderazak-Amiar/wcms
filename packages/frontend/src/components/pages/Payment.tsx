@@ -38,15 +38,14 @@ function AddRecord() {
   // Mutation pour ajouter un enregistrement
   const [submit, { loading }] = useMutation(addPayment, {
     onCompleted: (res) => {
-      enqueueSnackbar('Recensement fait avec succès', { variant: 'success' });
+      enqueueSnackbar('Paiement fait avec succès', { variant: 'success' });
     },
     onError: (err) => {
       console.error('==> error', err);
-      if (err.message.includes('DUPLICATION')) {
-        enqueueSnackbar('Duplication détectée', { variant: 'warning' });
-      }
-      if (err.message.includes('INVALID_RECORD')) {
-        enqueueSnackbar('Recensement incorrecte: valeur inférieur', {
+      if (err.message.includes('Total paid amount exceeds invoice amount')) {
+        enqueueSnackbar('Montant supérieur !', { variant: 'info' });
+      } else if (err.message.includes('Invoice not found')) {
+        enqueueSnackbar('Facture Non Trouvée', {
           variant: 'error',
         });
       } else {

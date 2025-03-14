@@ -225,3 +225,22 @@ export const UPDATE_INVOICE = gql`
     }
   }
 `;
+export const getDebtsByConsumer = gql`
+  query getDebtsByConsumer($consumerID: ID!) {
+    getDebtsByConsumer(consumerID: $consumerID) {
+      debtID
+      amount
+      createdAt
+      invoiceID
+    }
+  }
+`;
+
+export const UPDATE_INVOICE_PRINTED = gql`
+  mutation UPDATE_INVOICE_PRINTED($invoiceID: String!) {
+    updateInvoicePrinted(invoiceID: $invoiceID) {
+      invoiceID
+      isPrinted
+    }
+  }
+`;

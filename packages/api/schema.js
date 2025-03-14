@@ -31,6 +31,7 @@ type Consumer {
     updatedAt: String
     user: User
     counters: [Counter]
+    debts:[Debt]
 }
 
 type Record {
@@ -118,6 +119,7 @@ type Query {
     invoice(invoiceID: ID!): Invoice
     getSettings: Settings
     getDebt(invoiceID: ID!): Debt
+    getDebtsByConsumer(consumerID: ID!): [Debt]
     getDebts(consumerID: ID!): [Debt]
 }
 
@@ -131,6 +133,7 @@ type Mutation {
     deleteCounters(counterIDs: [ID!]!): [Counter]
     addSettings(m3price: String!, village: String!): Settings!
     updateSettings(m3Price: String!, village: String!): Settings!
+    updateInvoicePrinted(invoiceID: String!): Invoice
     createInvoice(
     amount: Float!
     paymentCode: String!
@@ -312,6 +315,28 @@ export const resolvers = {
         );
       });
     },
+    getDebtsByConsumer: (_, { consumerID }) => {
+      console.log('Received consumerID:', consumerID); // Debug log
+      return new Promise((resolve, reject) => {
+        db.all(
+          'SELECT * FROM debt WHERE consumerID = ?',
+          [consumerID],
+          (err, rows) => {
+            // Fix: `row` should be `rows`
+            if (err) {
+              console.error('Error fetching debt:', err);
+              reject(err);
+              return;
+            }
+            if (!rows || rows.length === 0) {
+              console.warn(`No debt found for consumer: ${consumerID}`);
+            }
+            resolve(rows); // Fix: Use `rows` instead of `row`
+          },
+        );
+      });
+    },
+
     getDebts: async (_, { consumerID }) => {
       return new Promise((resolve, reject) => {
         db.all(
@@ -772,21 +797,43 @@ export const resolvers = {
             } else if (!invoice) {
               reject(new Error('Invoice not found'));
             } else {
-              // Step 1: Delete the related record first
+              // Step 1: Delete related payments
               db.run(
-                'DELETE FROM record WHERE recordID = ?',
-                [invoice.recordID],
+                'DELETE FROM payment WHERE invoiceID = ?',
+                [invoiceID],
                 function (err) {
                   if (err) {
                     reject(err);
                   } else {
-                    // Step 2: Delete the invoice
+                    // Step 2: Delete related debts
                     db.run(
-                      'DELETE FROM invoice WHERE invoiceID = ?',
+                      'DELETE FROM debt WHERE invoiceID = ?',
                       [invoiceID],
                       function (err) {
-                        if (err) reject(err);
-                        else resolve(invoice); // Return the deleted invoice
+                        if (err) {
+                          reject(err);
+                        } else {
+                          // Step 3: Delete the related record (if applicable)
+                          db.run(
+                            'DELETE FROM record WHERE recordID = ?',
+                            [invoice.recordID],
+                            function (err) {
+                              if (err) {
+                                reject(err);
+                              } else {
+                                // Step 4: Delete the invoice itself
+                                db.run(
+                                  'DELETE FROM invoice WHERE invoiceID = ?',
+                                  [invoiceID],
+                                  function (err) {
+                                    if (err) reject(err);
+                                    else resolve(invoice); // Return the deleted invoice
+                                  },
+                                );
+                              }
+                            },
+                          );
+                        }
                       },
                     );
                   }
@@ -829,6 +876,25 @@ export const resolvers = {
           },
         );
       }),
+    updateInvoicePrinted: async (_, { invoiceID }) => {
+      try {
+        if (!db) throw new Error('Database connection not established');
+
+        const result = await db.run(
+          `UPDATE invoice SET isPrinted = 1 WHERE invoiceID = ?`,
+          [invoiceID],
+        );
+
+        if (result.changes === 0) {
+          throw new Error('Failed to update invoice');
+        }
+
+        return { invoiceID, isPrinted: true };
+      } catch (error) {
+        console.error('Error updating invoice:', error);
+        throw new Error('Failed to update invoice');
+      }
+    },
   },
   Counter: {
     consumer: (parent) => {
@@ -876,6 +942,18 @@ export const resolvers = {
           [parent.consumerID],
           (err, rows) => {
             if (err) reject(err);
+            resolve(rows);
+          },
+        );
+      });
+    },
+    debts: async (parent) => {
+      return new Promise((resolve, reject) => {
+        db.all(
+          `SELECT * FROM debt WHERE consumerID = ?`,
+          [parent.consumerID],
+          (err, rows) => {
+            if (err) return reject(err);
             resolve(rows);
           },
         );

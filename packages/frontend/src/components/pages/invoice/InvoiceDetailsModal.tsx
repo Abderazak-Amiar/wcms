@@ -1,5 +1,6 @@
 import { useQuery } from '@apollo/client';
 import {
+  Box,
   Button,
   CircularProgress,
   Dialog,
@@ -55,92 +56,105 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
 
   return (
     <Dialog open={!!invoiceID} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle className="invoice-header">
-        Détails de la Facture
+      <DialogTitle
+        sx={{
+          backgroundColor: '#1976d2',
+          color: '#fff',
+          textAlign: 'center',
+          py: 2,
+        }}
+      >
+        <Typography variant="h5">Détails de la Facture</Typography>
       </DialogTitle>
-      <DialogContent className="invoice-container">
+      <DialogContent sx={{ p: 3 }}>
         {loading ? (
           <CircularProgress />
         ) : error ? (
           <Typography color="error">Erreur : {error.message}</Typography>
         ) : invoice ? (
           <>
-            {/* Première ligne : Informations de la facture et relevé */}
-            <Grid container spacing={2}>
+            {/* Header Section */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={6}>
-                <Paper sx={{ p: 2 }}>
-                  <Typography>
-                    <strong>Code Facture :</strong>{' '}
-                    {invoice.invoiceID.substring(0, 8)}
-                  </Typography>
-                  <Typography>
-                    <strong>Période :</strong> {invoice.record?.period ?? 'N/A'}
-                  </Typography>
-                  <Typography>
-                    <strong>Date Facturation :</strong>{' '}
-                    {formatDate(invoice.createdAt)}
-                  </Typography>
-                </Paper>
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  Informations de la Facture
+                </Typography>
+                <Typography>
+                  <strong>Code Facture :</strong>{' '}
+                  {invoice.invoiceID.substring(0, 8)}
+                </Typography>
+                <Typography>
+                  <strong>Période :</strong> {invoice.record?.period ?? 'N/A'}
+                </Typography>
+                <Typography>
+                  <strong>Date Facturation :</strong>{' '}
+                  {formatDate(invoice.createdAt)}
+                </Typography>
               </Grid>
 
               <Grid item xs={6}>
-                <Paper sx={{ p: 2 }}>
-                  <Typography>
-                    <strong>Date Relevé :</strong>{' '}
-                    {formatDate(invoice.record?.recordDate)}
-                  </Typography>
-                  <Typography>
-                    <strong>Prochain Relevé :</strong>{' '}
-                    {formatDate(invoice.record?.nextRecordDate)}
-                  </Typography>
-                  <Typography>
-                    <strong>Ancien Relevé :</strong>{' '}
-                    {invoice.record?.oldRecord ?? 'N/A'} m³
-                  </Typography>
-                  <Typography>
-                    <strong>Nouveau Relevé :</strong>{' '}
-                    {invoice.record?.newRecord ?? 'N/A'} m³
-                  </Typography>
-                </Paper>
-              </Grid>
-            </Grid>
-
-            <Divider sx={{ my: 2 }} />
-
-            {/* Deuxième ligne : Détails du consommateur et compteur */}
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <Paper sx={{ p: 2 }}>
-                  <Typography>
-                    <strong>Code Consommateur :</strong>{' '}
-                    {invoice.consumer?.consumerID.substring(0, 8) ?? 'N/A'}
-                  </Typography>
-                  <Typography>
-                    <strong>Consommateur :</strong>{' '}
-                    {invoice.consumer?.fullName ?? 'N/A'}
-                  </Typography>
-                </Paper>
-              </Grid>
-
-              <Grid item xs={6}>
-                <Paper sx={{ p: 2 }}>
-                  <Typography>
-                    <strong>Code Compteur :</strong>{' '}
-                    {invoice?.counter?.counterID ?? 'N/A'}
-                  </Typography>
-                  <Typography>
-                    <strong>Statut :</strong>{' '}
-                    {invoice?.counter?.status ?? 'N/A'}
-                  </Typography>
-                </Paper>
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  Relevé du Compteur
+                </Typography>
+                <Typography>
+                  <strong>Date Relevé :</strong>{' '}
+                  {formatDate(invoice.record?.recordDate)}
+                </Typography>
+                <Typography>
+                  <strong>Prochain Relevé :</strong>{' '}
+                  {formatDate(invoice.record?.nextRecordDate)}
+                </Typography>
+                <Typography>
+                  <strong>Ancien Relevé :</strong>{' '}
+                  {invoice.record?.oldRecord ?? 'N/A'} m³
+                </Typography>
+                <Typography>
+                  <strong>Nouveau Relevé :</strong>{' '}
+                  {invoice.record?.newRecord ?? 'N/A'} m³
+                </Typography>
               </Grid>
             </Grid>
 
             <Divider sx={{ my: 2 }} />
 
-            {/* Troisième ligne : Tableau de consommation */}
-            <TableContainer component={Paper}>
-              <Table className="invoice-table">
+            {/* Consumer and Counter Details */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={6}>
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  Détails du Consommateur
+                </Typography>
+                <Typography>
+                  <strong>Code Consommateur :</strong>{' '}
+                  {invoice.consumer?.consumerID.substring(0, 8) ?? 'N/A'}
+                </Typography>
+                <Typography>
+                  <strong>Consommateur :</strong>{' '}
+                  {invoice.consumer?.fullName ?? 'N/A'}
+                </Typography>
+              </Grid>
+
+              <Grid item xs={6}>
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  Détails du Compteur
+                </Typography>
+                <Typography>
+                  <strong>Code Compteur :</strong>{' '}
+                  {invoice?.counter?.counterID ?? 'N/A'}
+                </Typography>
+                <Typography>
+                  <strong>Statut :</strong> {invoice?.counter?.status ?? 'N/A'}
+                </Typography>
+              </Grid>
+            </Grid>
+
+            <Divider sx={{ my: 2 }} />
+
+            {/* Consumption Table */}
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Détails de la Consommation
+            </Typography>
+            <TableContainer component={Paper} sx={{ mb: 3 }}>
+              <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell align="center">
@@ -167,18 +181,23 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
               </Table>
             </TableContainer>
 
-            {/* Montant Total */}
+            {/* Total Amount */}
             <Typography variant="h6" align="right" sx={{ mt: 2 }}>
               <strong>Montant Total :</strong>{' '}
               {Number(invoice.amount ?? 0).toFixed(2)} DA
             </Typography>
 
-            {/* Bouton d'impression (Caché en mode impression) */}
-            <div className="invoice-section no-print">
-              <Button variant="contained" color="primary" onClick={handlePrint}>
+            {/* Print Button (Hidden in Print Mode) */}
+            <Box sx={{ mt: 3, textAlign: 'center' }} className="no-print">
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handlePrint}
+                sx={{ px: 4, py: 1 }}
+              >
                 Imprimer la Facture
               </Button>
-            </div>
+            </Box>
           </>
         ) : (
           <Typography>Aucune donnée de facture disponible.</Typography>
