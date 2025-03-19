@@ -99,6 +99,9 @@ type Payment{
 type Settings {
   m3price: Float
   village: String
+  phone: String
+  email: String
+  deadline: String
   createdAt: String
   updatedAt: String
 }
@@ -131,7 +134,7 @@ type Mutation {
     updateConsumer(consumerID: ID!, edits: updateConsumerInput!): Consumer
     deleteConsumers(consumerIDs: [ID!]!): [Consumer]
     deleteCounters(counterIDs: [ID!]!): [Counter]
-    addSettings(m3price: String!, village: String!): Settings!
+    addSettings(m3price: Float!, village: String!, phone: String, email:String, deadline: String!): Settings!
     updateSettings(m3Price: String!, village: String!): Settings!
     updateInvoicePrinted(invoiceID: String!): Invoice
     createInvoice(
@@ -359,7 +362,7 @@ export const resolvers = {
   },
 
   Mutation: {
-    addSettings: (_, { m3price, village }) =>
+    addSettings: (_, { m3price, village, phone, email, deadline }) =>
       new Promise((resolve, reject) => {
         if (!db.open) return reject(new Error('Database is closed'));
 
@@ -371,8 +374,15 @@ export const resolvers = {
           if (row) {
             // Update existing settings
             db.run(
-              `UPDATE settings SET m3price = ?, village = ?, updatedAt = ? WHERE rowid = (SELECT rowid FROM settings LIMIT 1)`,
-              [m3price, village, updatedAt],
+              `UPDATE settings SET m3price = ?, village = ?, updatedAt = ?, phone = ?, email = ?, deadline = ? WHERE rowid = (SELECT rowid FROM settings LIMIT 1)`,
+              [
+                parseFloat(m3price).toFixed(2),
+                village,
+                updatedAt,
+                phone,
+                email,
+                deadline,
+              ],
               function (err) {
                 if (err) reject(err);
                 resolve({
@@ -380,6 +390,9 @@ export const resolvers = {
                   village,
                   createdAt: row.createdAt, // Ensure createdAt is returned
                   updatedAt,
+                  phone,
+                  email,
+                  deadline,
                 });
               },
             );
@@ -387,11 +400,26 @@ export const resolvers = {
             // Insert new settings if it doesn't exist
             const createdAt = new Date().toISOString();
             db.run(
-              `INSERT INTO settings (m3Price, village, createdAt) VALUES (?, ?, ?)`,
-              [m3price, village, createdAt],
+              `INSERT INTO settings (m3Price, village, createdAt, phone, email, deadline) VALUES (?, ?, ?, ?, ?, ?)`,
+              [
+                parseFloat(m3price).toFixed(2),
+                village,
+                createdAt,
+                phone,
+                email,
+                deadline,
+              ],
               function (err) {
                 if (err) reject(err);
-                resolve({ m3price, village, createdAt, updatedAt: null });
+                resolve({
+                  m3price,
+                  village,
+                  createdAt,
+                  updatedAt: null,
+                  phone,
+                  email,
+                  deadline,
+                });
               },
             );
           }

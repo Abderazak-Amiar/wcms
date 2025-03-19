@@ -27,21 +27,18 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { saveAs } from 'file-saver'; // Optional: for saving files in the browser
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import JSZip from 'jszip';
 import moment from 'moment';
 import React, { useEffect, useState } from 'react';
 import {
   DELETE_INVOICE,
   GET_INVOICES,
   UPDATE_INVOICE_PRINTED,
-  getSettings,
 } from '../../../api/apollo';
 import InvoiceDetailsModal from './InvoiceDetailsModal';
 
-type Invoice = {
+interface Invoice {
   invoiceID: string;
   createdAt: string;
   amount: number;
@@ -66,241 +63,26 @@ type Invoice = {
     isPaid: boolean;
     amount: string;
   };
-};
-
-type Settings = {
-  getSettings: {
-    m3price: GLfloat;
-    village: string;
-    phone: string;
-    email: string;
-    deadline: string;
-  };
-};
+}
 
 // Utility function to generate PDF for an invoice
-
-const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
-  const quantityConsumed =
-    (invoice?.record?.newRecord ?? 0) - (invoice?.record?.oldRecord ?? 0);
+const generateInvoicePDF = (invoice: Invoice) => {
   const doc = new jsPDF();
-
-  // Header Section
+  doc.text(`Facture ID: ${invoice.invoiceID}`, 10, 10);
+  doc.text(`Date: ${moment(invoice.createdAt).format('DD-MMM-YYYY')}`, 10, 20);
+  doc.text(`Montant: ${invoice.amount} DA`, 10, 30);
+  doc.text(`Consommateur: ${invoice.consumer.fullName}`, 10, 40);
   autoTable(doc, {
+    startY: 50,
+    head: [['Période', 'Ancien relevé', 'Nouveau relevé']],
     body: [
       [
-        {
-          content: "Facture D'eau",
-          styles: {
-            halign: 'left',
-            fontSize: 20,
-            fontStyle: 'bold',
-          },
-        },
-        {
-          content: `Village ${
-            settings?.getSettings.village?.toUpperCase() ?? ''
-          }`,
-          styles: {
-            halign: 'right',
-            fontSize: 20,
-            fontStyle: 'bold',
-          },
-        },
+        invoice.record.period,
+        invoice.record.oldRecord,
+        invoice.record.newRecord,
       ],
     ],
-    theme: 'plain',
   });
-
-  // Invoice Details Table
-  autoTable(doc, {
-    body: [
-      // Labels Row (Bold)
-      [
-        {
-          content: 'Code Facture:',
-          styles: { fontStyle: 'bold', halign: 'center' },
-        },
-        {
-          content: 'Période:',
-          styles: { fontStyle: 'bold', halign: 'center' },
-        },
-        { content: 'Date:', styles: { fontStyle: 'bold', halign: 'center' } },
-      ],
-      // Values Row (Normal)
-      [
-        { content: invoice?.invoiceID || 'N/A', styles: { halign: 'center' } },
-        {
-          content: invoice?.record?.period || 'N/A',
-          styles: { halign: 'center' },
-        },
-        {
-          content: moment(invoice?.createdAt).format('DD MMM YYYY'),
-          styles: { halign: 'center' },
-        },
-      ],
-    ],
-    theme: 'grid',
-    styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
-    columnStyles: {
-      0: { cellWidth: 'auto' }, // First column (adjust as needed)
-      1: { cellWidth: 'auto' }, // Second column
-      2: { cellWidth: 'auto' }, // Third column
-    },
-  });
-
-  autoTable(doc, {
-    body: [
-      [
-        { content: 'Consommateur:', styles: { fontStyle: 'bold' } },
-        { content: 'Code consommateur:', styles: { fontStyle: 'bold' } },
-      ],
-      [invoice?.consumer?.fullName || '', invoice?.consumer?.consumerID || ''],
-    ],
-    theme: 'grid',
-    styles: {
-      lineColor: [200, 200, 200], // Light grey borders
-      lineWidth: 0.5,
-      cellPadding: 5, // Ensures spacing
-    },
-    didParseCell: function (data) {
-      // Apply horizontal border every 2 rows
-      const isEvenRow = data.row.index % 2 === 1; // 1, 3, 5 (second row of each group)
-
-      data.cell.styles.lineWidth = {
-        top: 0, // No top border
-        bottom: isEvenRow ? 0.5 : 0, // Add bottom border only every 2 rows
-        left: 0.5, // Keep left border
-        right: 0.5, // Keep right border
-      };
-    },
-  });
-  autoTable(doc, {
-    body: [
-      [
-        { content: 'Date Relevé:', styles: { fontStyle: 'bold' } },
-        { content: 'Prochain Relevé:', styles: { fontStyle: 'bold' } },
-        { content: 'Ancien Relevé:', styles: { fontStyle: 'bold' } },
-        { content: 'Nouveau Relevé:', styles: { fontStyle: 'bold' } },
-      ],
-      [
-        moment(invoice?.record?.recordDate).format('DD MMM YYYY'),
-        moment(invoice?.record?.nextRecordDate).format('DD MMM YYYY'),
-        `${invoice?.record?.oldRecord} m³` || '',
-        `${invoice?.record?.newRecord} m³` || '',
-      ],
-    ],
-    theme: 'grid',
-    styles: {
-      lineColor: [200, 200, 200], // Light grey borders
-      lineWidth: 0.5,
-      cellPadding: 5, // Ensures spacing
-    },
-    didParseCell: function (data) {
-      // Apply horizontal border every 2 rows
-      const isEvenRow = data.row.index % 2 === 1; // 1, 3, 5 (second row of each group)
-
-      data.cell.styles.lineWidth = {
-        top: 0, // No top border
-        bottom: isEvenRow ? 0.5 : 0, // Add bottom border only every 2 rows
-        left: 0.5, // Keep left border
-        right: 0.5, // Keep right border
-      };
-    },
-  });
-  autoTable(doc, {
-    body: [
-      [
-        { content: 'Numéro Compteur:', styles: { fontStyle: 'bold' } },
-        { content: 'Statut:', styles: { fontStyle: 'bold' } },
-      ],
-      [invoice?.counter?.counterID || '', invoice?.counter?.status || ''],
-    ],
-    theme: 'grid',
-    styles: {
-      lineColor: [200, 200, 200], // Light grey borders
-      lineWidth: 0.5,
-      cellPadding: 5, // Ensures spacing
-    },
-    didParseCell: function (data) {
-      // Apply horizontal border every 2 rows
-      const isEvenRow = data.row.index % 2 === 1; // 1, 3, 5 (second row of each group)
-
-      data.cell.styles.lineWidth = {
-        top: 0, // No top border
-        bottom: isEvenRow ? 0.5 : 0, // Add bottom border only every 2 rows
-        left: 0.5, // Keep left border
-        right: 0.5, // Keep right border
-      };
-    },
-  });
-
-  autoTable(doc, {
-    body: [
-      [
-        { content: 'Quantité Consommée', styles: { fontStyle: 'bold' } },
-        { content: 'Prix Unitaire', styles: { fontStyle: 'bold' } },
-        { content: 'Total', styles: { fontStyle: 'bold' } },
-      ],
-      [
-        `${quantityConsumed.toString()} m³`,
-        `${Number(settings?.getSettings.m3price ?? 0).toFixed(2)}`,
-        Number(invoice?.amount ?? 0).toFixed(2) + ' DA',
-      ],
-    ],
-    theme: 'grid',
-    styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
-  });
-
-  // Total Amount
-  autoTable(doc, {
-    body: [
-      [
-        {
-          content: 'Montant total:',
-          styles: { halign: 'right', fontSize: 14, fontStyle: 'bold' },
-        },
-        { content: invoice?.amount + ' DA', styles: { halign: 'right' } },
-      ],
-    ],
-    theme: 'grid',
-    styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
-  });
-
-  // Terms & Notes
-  autoTable(doc, {
-    body: [
-      [
-        {
-          content: 'Conditions & Remarques',
-          styles: { halign: 'left', fontSize: 14, fontStyle: 'bold' },
-        },
-      ],
-      [
-        {
-          content:
-            "Veuillez, s'il vous plaît, vous approcher du bureau du comité du village afin de payer votre facture.\nVotre délai est de 15 jours. Nous vous remercions pour votre fidélité.",
-          styles: { halign: 'left' },
-        },
-      ],
-    ],
-    theme: 'grid',
-    styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
-  });
-
-  // Footer
-  autoTable(doc, {
-    body: [
-      [
-        {
-          content: '',
-          styles: { halign: 'center', fontSize: 12, fontStyle: 'bold' },
-        },
-      ],
-    ],
-    theme: 'plain',
-  });
-
   return doc;
 };
 
@@ -330,17 +112,21 @@ const DeleteConfirmationDialog: React.FC<{
 );
 
 const InvoiceList: React.FC = () => {
+  // Fetch invoices
+  const { refetch, loading, error, data } = useQuery<{ invoices: Invoice[] }>(
+    GET_INVOICES,
+  );
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
-  const [consumerFilter, setConsumerFilter] = useState<string>('');
+
+  // Filters state
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid'>(
     'all',
   );
-
-  const [periodFilter, setPeriodFilter] = useState<string>('all');
+  const [consumerFilter, setConsumerFilter] = useState<string>('');
   const [dateRangeFilter, setDateRangeFilter] = useState<{
     start: string;
     end: string;
@@ -348,6 +134,12 @@ const InvoiceList: React.FC = () => {
     start: '',
     end: '',
   });
+  const [periodFilter, setPeriodFilter] = useState<string>('all');
+
+  // Period options
+  const periodOptions = ['Jan - Mar', 'Apr - Jun', 'Jul - Sep', 'Oct - Dec'];
+
+  // Mutations
   const [deleteInvoice] = useMutation(DELETE_INVOICE, {
     update(cache, { data }) {
       if (data?.deleteInvoice) {
@@ -368,29 +160,6 @@ const InvoiceList: React.FC = () => {
   });
 
   const [updateInvoicePrinted] = useMutation(UPDATE_INVOICE_PRINTED);
-  // Fetch invoices
-  const { refetch, loading, error, data } = useQuery<{ invoices: Invoice[] }>(
-    GET_INVOICES,
-  );
-  // Fetch Settings
-  const {
-    loading: loadingSettings,
-    error: errorSettings,
-    data: dataSettings,
-  } = useQuery<Settings>(getSettings);
-  console.log('==>dataSettings', dataSettings?.getSettings);
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
-
-  console.log('==>invoice', data);
-
-  // Filters state
-
-  // Period options
-  const periodOptions = ['Jan - Mar', 'Apr - Jun', 'Jul - Sep', 'Oct - Dec'];
-
-  // Mutations
 
   // Handle selection
   const handleSelect = (id: string) => {
@@ -426,10 +195,9 @@ const InvoiceList: React.FC = () => {
     }
   };
 
+  // Generate and download invoices
   const handlePrintInvoices = async () => {
     if (selectedInvoices.length === 0) return;
-
-    const zip = new JSZip();
 
     await Promise.all(
       selectedInvoices.map(async (invoiceID) => {
@@ -437,23 +205,13 @@ const InvoiceList: React.FC = () => {
           (inv) => inv.invoiceID === invoiceID,
         );
         if (!invoice) return;
-        if (!dataSettings) return;
-        const doc = generateInvoicePDF(invoice, dataSettings);
-        const pdfBlob = doc.output('blob');
-        zip.file(`Facture_${invoice.invoiceID}.pdf`, pdfBlob);
+
+        const doc = generateInvoicePDF(invoice);
+        doc.save(`Facture_${invoice.invoiceID}.pdf`);
+
         await updateInvoicePrinted({ variables: { invoiceID } });
       }),
     );
-
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
-
-    // Save the ZIP file using Electron's file save dialog
-    if (window.electron) {
-      window.electron.savePDFs(zipBlob);
-    } else {
-      // Fallback for browser environment
-      saveAs(zipBlob, 'invoices.zip');
-    }
 
     setSelectedInvoices([]);
     refetch();
@@ -493,14 +251,14 @@ const InvoiceList: React.FC = () => {
     return true;
   });
 
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
   if (loading) return <Typography>Loading...</Typography>;
   if (error)
     return <Typography color="error">Error: {error.message}</Typography>;
-  if (loadingSettings) return <Typography>Loading...</Typography>;
-  if (errorSettings)
-    return (
-      <Typography color="error">Error: {errorSettings.message}</Typography>
-    );
+
   return (
     <Box sx={{ padding: 3 }}>
       {/* Filters Section */}

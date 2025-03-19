@@ -1,23 +1,13 @@
-import { app, BrowserWindow, Menu } from 'electron';
-// import { createRequire } from 'node:module'
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import fs from 'fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// The built directory structure
-//
-// ├─┬─┬ dist
-// │ │ └── index.html
-// │ │
-// │ ├─┬ dist-electron
-// │ │ ├── main.js
-// │ │ └── preload.mjs
-// │
 process.env.APP_ROOT = path.join(__dirname, '..');
-
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
+// In your main process (e.g., main.ts)
+import { dialog } from 'electron';
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
@@ -30,15 +20,16 @@ let win: BrowserWindow | null;
 
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    icon: path.join(process.env.VITE_PUBLIC as string, 'electron-vite.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       devTools: false,
+      nodeIntegration: true, // Ensure node integration for IPC
+      contextIsolation: false,
     },
     transparent: true,
   });
 
-  // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', new Date().toLocaleString());
   });
@@ -46,7 +37,6 @@ function createWindow() {
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    // win.loadFile('dist/index.html')
     win.loadFile(path.join(RENDERER_DIST, 'index.html'));
   }
 
@@ -65,7 +55,6 @@ function createWindow() {
         { role: 'selectAll' },
       ],
     },
-
     {
       label: 'View',
       submenu: [
@@ -79,7 +68,6 @@ function createWindow() {
         { role: 'togglefullscreen' },
       ],
     },
-
     {
       label: 'Window',
       submenu: [{ role: 'minimize' }, { role: 'close' }],
@@ -90,9 +78,59 @@ function createWindow() {
   Menu.setApplicationMenu(menu);
 }
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// Handle silent printing
+ipcMain.on('print-invoices', async (event, invoiceIds: string[]) => {
+  if (!win) return;
+
+  for (const invoiceId of invoiceIds) {
+    win.webContents.send('load-invoice', invoiceId); // Ask renderer to load invoice
+
+    // Wait for the invoice to load (adjust delay if needed)
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    win.webContents.print(
+      {
+        silent: true, // No confirmation dialog
+        printBackground: true,
+        color: false,
+        copies: 1,
+        landscape: false,
+        margins: { marginType: 'default' },
+      },
+      (success) => {
+        if (!success) {
+          console.error(`Failed to print invoice ${invoiceId}`);
+        }
+      },
+    );
+  }
+});
+
+// Handle PDF saving
+ipcMain.on('export-invoices-pdf', async (event, invoiceIds: string[]) => {
+  if (!win) return;
+
+  for (const invoiceId of invoiceIds) {
+    win.webContents.send('load-invoice', invoiceId);
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    const pdfPath = path.join(
+      app.getPath('documents'),
+      `invoice_${invoiceId}.pdf`,
+    );
+    const pdfData = await win.webContents.printToPDF({
+      margins: { marginType: 'default' },
+      printBackground: true,
+      landscape: false,
+      pageSize: 'A4',
+    });
+
+    fs.writeFileSync(pdfPath, pdfData);
+    console.log(`Saved: ${pdfPath}`);
+  }
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
@@ -101,11 +139,25 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
 });
 
 app.whenReady().then(createWindow);
+
+ipcMain.handle('save-pdfs', async (event, zipBlob) => {
+  const { filePath } = await dialog.showSaveDialog({
+    title: 'Save Invoices',
+    defaultPath: path.join(__dirname, 'invoices.zip'),
+    filters: [{ name: 'ZIP Files', extensions: ['zip'] }],
+  });
+
+  // Check if filePath is defined
+  if (filePath) {
+    fs.writeFileSync(filePath, Buffer.from(zipBlob));
+    return true; // Indicate success
+  }
+
+  return false; // Indicate cancellation or failure
+});

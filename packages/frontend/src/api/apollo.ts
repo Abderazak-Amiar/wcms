@@ -65,10 +65,13 @@ export const addRecord = gql`
   }
 `;
 export const addSettings = gql`
-  mutation ($m3price: String!, $village: String!) {
-    addSettings(m3price: $m3price, village: $village) {
+  mutation ($m3price: Float!, $village: String!, $phone: String, $email: String, $deadline:String!) {
+    addSettings(m3price: $m3price, village: $village, phone: $phone, email: $email, deadline: $deadline) {
       m3price
       village
+      phone
+      email
+      deadline
     }
   }
 `;
@@ -77,6 +80,9 @@ export const getSettings = gql`
     getSettings {
       m3price
       village
+      phone
+      email
+      deadline
     }
   }
 `;
