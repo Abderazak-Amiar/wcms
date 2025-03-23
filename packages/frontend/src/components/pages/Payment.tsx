@@ -48,6 +48,10 @@ function AddRecord() {
         enqueueSnackbar('Facture Non Trouvée', {
           variant: 'error',
         });
+      } else if (err.message.includes('Invoice does not belong to this consumer')) {
+        enqueueSnackbar('Facture n\'appartient pas à ce consommateur', {
+          variant: 'error',
+        });
       } else {
         enqueueSnackbar('Une erreur est survenue', { variant: 'error' });
       }

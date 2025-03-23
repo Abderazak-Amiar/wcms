@@ -37,6 +37,7 @@ function AddConsumer() {
       console.log('==>onCompleted', res);
       enqueueSnackbar('Consomateur ajouté', { variant: 'success' });
       refetch();
+      formik.resetForm();
     },
     onError: (err) => {
       console.log('==>error', err);

@@ -69,7 +69,7 @@ interface Invoice {
 const generateInvoicePDF = (invoice: Invoice) => {
   const doc = new jsPDF();
   doc.text(`Facture ID: ${invoice.invoiceID}`, 10, 10);
-  doc.text(`Date: ${moment(invoice.createdAt).format('DD-MMM-YYYY')}`, 10, 20);
+  doc.text(`Date: ${moment(invoice.createdAt).format('DD MMM YYYY HH:mm')}`, 10, 20);
   doc.text(`Montant: ${invoice.amount} DA`, 10, 30);
   doc.text(`Consommateur: ${invoice.consumer.fullName}`, 10, 40);
   autoTable(doc, {
@@ -395,7 +395,7 @@ const InvoiceList: React.FC = () => {
                         : 'NP'}
                     </TableCell>
                     <TableCell>
-                      {moment(item.createdAt).format('DD-MMM-YYYY')}
+                      {moment(item.createdAt).format('DD MMM YYYY HH:mm')}
                     </TableCell>
                     <TableCell>
                       <IconButton

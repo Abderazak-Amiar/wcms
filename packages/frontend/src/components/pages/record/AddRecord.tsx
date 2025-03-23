@@ -48,7 +48,7 @@ function AddRecord() {
   // Mutation pour ajouter un enregistrement
   const [submit, { loading }] = useMutation(addRecord, {
     onCompleted: (res) => {
-      enqueueSnackbar('Paiement fait avec succès', { variant: 'success' });
+      enqueueSnackbar('Recensement fait avec succès', { variant: 'success' });
     },
     onError: (err) => {
       console.error('==> error', err);
@@ -56,7 +56,9 @@ function AddRecord() {
         enqueueSnackbar('Duplication détectée', { variant: 'warning' });
       }
       if (err.message.includes('INVALID_RECORD')) {
-        enqueueSnackbar('Recensement incorrecte: valeur inférieur', { variant: 'error' });
+        enqueueSnackbar('Recensement incorrecte: valeur inférieur', {
+          variant: 'error',
+        });
       } else {
         enqueueSnackbar('Une erreur est survenue', { variant: 'error' });
       }

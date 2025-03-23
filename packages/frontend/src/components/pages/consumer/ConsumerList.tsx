@@ -1,9 +1,15 @@
 import { useMutation, useQuery } from '@apollo/client';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import {
   Box,
+  Button,
   Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControlLabel,
   IconButton,
   Paper,
@@ -16,6 +22,7 @@ import {
   TablePagination,
   TableRow,
   TableSortLabel,
+  TextField,
   Toolbar,
   Tooltip,
   Typography,
@@ -23,8 +30,14 @@ import {
 import { alpha } from '@mui/material/styles';
 import { visuallyHidden } from '@mui/utils';
 import moment from 'moment';
+import { enqueueSnackbar } from 'notistack';
 import React, { useEffect, useState } from 'react';
-import { deleteConsumers, getConsumers } from '../../../api/apollo';
+import {
+  deleteConsumers,
+  getConsumers,
+  updateConsumer,
+} from '../../../api/apollo';
+import DeleteConfirmationDialog from '../../molecules/DeleteConfirmationDialog';
 
 interface Consumer {
   consumerID: string;
@@ -53,7 +66,7 @@ function getComparator<Key extends keyof any>(
 }
 
 interface HeadCell {
-  id: keyof Consumer;
+  id: keyof Consumer | 'actions';
   label: string;
   numeric: boolean;
   disablePadding: boolean;
@@ -77,6 +90,12 @@ const headCells: readonly HeadCell[] = [
     numeric: false,
     disablePadding: false,
     label: 'Date de Création',
+  },
+  {
+    id: 'actions',
+    numeric: false,
+    disablePadding: false,
+    label: 'Actions',
   },
 ];
 
@@ -125,18 +144,24 @@ function EnhancedTableHead(props: EnhancedTableProps) {
             padding={headCell.disablePadding ? 'none' : 'normal'}
             sortDirection={orderBy === headCell.id ? order : false}
           >
-            <TableSortLabel
-              active={orderBy === headCell.id}
-              direction={orderBy === headCell.id ? order : 'asc'}
-              onClick={createSortHandler(headCell.id)}
-            >
-              {headCell.label}
-              {orderBy === headCell.id ? (
-                <Box component="span" sx={visuallyHidden}>
-                  {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
-                </Box>
-              ) : null}
-            </TableSortLabel>
+            {headCell.id !== 'actions' ? (
+              <TableSortLabel
+                active={orderBy === headCell.id}
+                direction={orderBy === headCell.id ? order : 'asc'}
+                onClick={createSortHandler(headCell.id)}
+              >
+                {headCell.label}
+                {orderBy === headCell.id ? (
+                  <Box component="span" sx={visuallyHidden}>
+                    {order === 'desc'
+                      ? 'sorted descending'
+                      : 'sorted ascending'}
+                  </Box>
+                ) : null}
+              </TableSortLabel>
+            ) : (
+              headCell.label
+            )}
           </TableCell>
         ))}
       </TableRow>
@@ -146,49 +171,13 @@ function EnhancedTableHead(props: EnhancedTableProps) {
 
 interface EnhancedTableToolbarProps {
   numSelected: number;
-  selected: string[];
-  consumers: Consumer[];
-  setConsumers: React.Dispatch<React.SetStateAction<Consumer[]>>;
-  refetchConsumers: () => void; // New prop for refetch
+  handleDeleteConfirm: () => void;
 }
 
 const EnhancedTableToolbar = ({
   numSelected,
-  selected,
-  consumers,
-  setConsumers,
-  refetchConsumers, // Use refetch in toolbar
+  handleDeleteConfirm,
 }: EnhancedTableToolbarProps) => {
-  const [deleteConsumer, { loading, error }] = useMutation(deleteConsumers);
-
-  const handleDelete = async (consumerIDs: string[]) => {
-    if (!consumerIDs || consumerIDs.length === 0) {
-      console.error('No consumers selected for deletion');
-      return;
-    }
-
-    try {
-      // Optimistic update - immediately remove selected consumers from the UI
-      const newConsumers = consumers.filter(
-        (consumer) => !consumerIDs.includes(consumer.consumerID),
-      );
-      setConsumers(newConsumers);
-
-      // Perform the mutation
-      const response = await deleteConsumer({
-        variables: { consumerId: consumerIDs },
-      });
-
-      // Refetch the data after successful deletion
-      refetchConsumers();
-
-      console.log('Consumers deleted:', response.data.deleteConsumers);
-    } catch (err) {
-      console.error('Error deleting consumers:', err);
-      setConsumers(consumers); // Restore the consumers list if deletion fails
-    }
-  };
-
   return (
     <Toolbar
       sx={{
@@ -219,7 +208,7 @@ const EnhancedTableToolbar = ({
       )}
       {numSelected > 0 ? (
         <Tooltip title="Delete">
-          <IconButton onClick={() => handleDelete(selected)} disabled={loading}>
+          <IconButton onClick={handleDeleteConfirm}>
             <DeleteIcon />
           </IconButton>
         </Tooltip>
@@ -243,17 +232,17 @@ export default function ConsumerList() {
   const [page, setPage] = useState(0);
   const [dense, setDense] = useState(false);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [openEditModal, setOpenEditModal] = useState(false);
+  const [selectedConsumer, setSelectedConsumer] = useState<Consumer | null>(
+    null,
+  );
+  const [deleteTarget, setDeleteTarget] = useState<string[]>([]);
 
   useEffect(() => {
     if (data?.consumers) {
       setConsumers(data.consumers);
     }
   }, [data]);
-
-  // Pass the refetch function to the toolbar
-  const refetchConsumers = () => {
-    refetch();
-  };
 
   const handleRequestSort = (
     event: React.MouseEvent<unknown>,
@@ -318,6 +307,63 @@ export default function ConsumerList() {
     [order, orderBy, page, rowsPerPage, consumers],
   );
 
+  const [deleteConsumer] = useMutation(deleteConsumers, {
+    onCompleted: () => {
+      enqueueSnackbar('Consommateurs supprimés avec succès', {
+        variant: 'success',
+      });
+      refetch();
+      setDeleteTarget([]);
+      setSelected([]);
+    },
+    onError: () => {
+      enqueueSnackbar('Erreur lors de la suppression des consommateurs', {
+        variant: 'error',
+      });
+    },
+  });
+
+  const handleDeleteConfirm = () => {
+    setDeleteTarget(selected);
+  };
+
+  const handleDelete = async () => {
+    if (deleteTarget.length === 0) return;
+
+    try {
+      await deleteConsumer({
+        variables: { consumerIDs: deleteTarget },
+      });
+    } catch (error) {
+      console.error('Error deleting consumers:', error);
+    }
+  };
+
+  const [updateConsumerMutation] = useMutation(updateConsumer, {
+    onCompleted: () => {
+      enqueueSnackbar('Consommateur mis à jour avec succès', {
+        variant: 'success',
+      });
+      refetch();
+      setOpenEditModal(false);
+    },
+    onError: () => {
+      enqueueSnackbar('Erreur lors de la mise à jour du consommateur', {
+        variant: 'error',
+      });
+    },
+  });
+
+  const handleUpdateConsumer = () => {
+    if (!selectedConsumer) return;
+    updateConsumerMutation({
+      variables: {
+        consumerID: selectedConsumer.consumerID,
+        fullName: selectedConsumer.fullName,
+      },
+    });
+  };
+
   if (loading) return <Typography>Loading...</Typography>;
   if (error)
     return <Typography color="error">Error: {error.message}</Typography>;
@@ -327,10 +373,7 @@ export default function ConsumerList() {
       <Paper sx={{ width: '100%', mb: 2 }}>
         <EnhancedTableToolbar
           numSelected={selected.length}
-          selected={selected}
-          consumers={consumers}
-          setConsumers={setConsumers}
-          refetchConsumers={refetchConsumers} // Pass refetchConsumers here
+          handleDeleteConfirm={handleDeleteConfirm}
         />
         <TableContainer>
           <Table
@@ -347,8 +390,7 @@ export default function ConsumerList() {
               rowCount={consumers.length}
             />
             <TableBody>
-              {visibleRows.map((row, index) => {
-                console.log('==>row', row);
+              {visibleRows.map((row) => {
                 const isItemSelected = selected.includes(row.consumerID);
                 const labelId = `enhanced-table-checkbox-${row.consumerID}`;
 
@@ -366,9 +408,7 @@ export default function ConsumerList() {
                       <Checkbox
                         color="primary"
                         checked={isItemSelected}
-                        inputProps={{
-                          'aria-labelledby': labelId,
-                        }}
+                        inputProps={{ 'aria-labelledby': labelId }}
                       />
                     </TableCell>
                     <TableCell
@@ -377,23 +417,27 @@ export default function ConsumerList() {
                       scope="row"
                       padding="none"
                     >
-                      {index + 1}
+                      {row.consumerID}
                     </TableCell>
                     <TableCell align="left">{row.fullName}</TableCell>
                     <TableCell align="left">
-                      {moment(row.createdAt).format(
-                        'DD-MM-YYYY HH:mm:ss',
-                      )}
+                      {moment(row.createdAt).format('DD MMM YYYY HH:mm')}
+                    </TableCell>
+                    <TableCell>
+                      <IconButton
+                        onClick={() => {
+                          setSelectedConsumer(row); // Set the selected consumer
+                          setOpenEditModal(true); // Open the edit dialog
+                        }}
+                      >
+                        <EditIcon />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
                 );
               })}
               {emptyRows > 0 && (
-                <TableRow
-                  style={{
-                    height: (dense ? 33 : 53) * emptyRows,
-                  }}
-                >
+                <TableRow style={{ height: (dense ? 33 : 53) * emptyRows }}>
                   <TableCell colSpan={6} />
                 </TableRow>
               )}
@@ -414,6 +458,38 @@ export default function ConsumerList() {
       <FormControlLabel
         control={<Switch checked={dense} onChange={handleChangeDense} />}
         label="Marge dense"
+      />
+      <Dialog open={openEditModal} onClose={() => setOpenEditModal(false)}>
+        <DialogTitle>Modifier le consommateur</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            margin="dense"
+            label="Nom Complet"
+            value={selectedConsumer?.fullName || ''}
+            onChange={(e) =>
+              setSelectedConsumer((prev) =>
+                prev ? { ...prev, fullName: e.target.value } : null,
+              )
+            }
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenEditModal(false)} color="secondary">
+            Annuler
+          </Button>
+          <Button onClick={handleUpdateConsumer} color="primary">
+            Enregistrer
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <DeleteConfirmationDialog
+        open={deleteTarget.length > 0}
+        onClose={() => setDeleteTarget([])}
+        onConfirm={handleDelete}
+        message="Êtes-vous sûr de vouloir supprimer le(s) consommateur(s) ? Cette action est irréversible.
+
+        NB : Toutes les informations relatives seront supprimées, y compris les Compteurs, Factures, Paiements et Dettes."
       />
     </Box>
   );

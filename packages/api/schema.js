@@ -131,9 +131,10 @@ type Mutation {
     addPayment(consumerID: ID!, invoiceID:String!, paidAmount:Float!): Payment!
     addRecord(newRecord: String!, counterID: ID!, consumerID: ID!, period:String!): Record!
     addCounter(counterID: ID!, consumerID: ID!, price: String!): Counter!
-    updateConsumer(consumerID: ID!, edits: updateConsumerInput!): Consumer
-    deleteConsumers(consumerIDs: [ID!]!): [Consumer]
-    deleteCounters(counterIDs: [ID!]!): [Counter]
+    updateConsumer(consumerID: ID!, fullName: String!): Consumer
+    updateCounter(counterID: ID!, status: String!, price: String!, consumerID:ID!): ResponseMessage
+    deleteConsumers(consumerIDs: [ID!]!): ResponseMessage
+    deleteCounters(counterIDs: [ID!]!): ResponseMessage
     addSettings(m3price: Float!, village: String!, phone: String, email:String, deadline: String!): Settings!
     updateSettings(m3Price: String!, village: String!): Settings!
     updateInvoicePrinted(invoiceID: String!): Invoice
@@ -161,10 +162,6 @@ type Mutation {
   deleteInvoice(invoiceID: ID!): Invoice
 }
 
-input updateConsumerInput {
-    fullName: String
-    updatedAt: String
-}
 `;
 
 export const resolvers = {
@@ -460,20 +457,135 @@ export const resolvers = {
           },
         );
       }),
+    updateConsumer: (parent, args) => {
+      return new Promise((resolve, reject) => {
+        db.serialize(() => {
+          db.run(
+            `UPDATE consumer SET fullName = ? WHERE consumerID = ?`,
+            [args.fullName, args.consumerID],
+            function (err) {
+              if (err) {
+                console.error(err.message);
+                reject(new Error('Failed to update consumer.'));
+              } else if (this.changes === 0) {
+                reject(new Error('Consumer not found.'));
+              } else {
+                resolve({
+                  consumerID: args.consumerID,
+                  fullName: args.fullName,
+                });
+              }
+            },
+          );
+        });
+      });
+    },
+    updateCounter: (parent, args) => {
+      return new Promise((resolve, reject) => {
+        db.serialize(() => {
+          console.log(
+            `🟢 Request to update counter ${args.counterID} for consumer ${args.consumerID} with status '${args.status}'`,
+          );
+
+          // Only check if we are updating TO "En Marche"
+          if (args.status === 'En Marche') {
+            db.get(
+              `SELECT counterID FROM counter WHERE consumerID = ? AND status = 'En Marche' AND counterID != ?`,
+              [args.consumerID, args.counterID],
+              (err, row) => {
+                if (err) {
+                  console.error(
+                    "❌ Database Error (Checking 'En Marche'):",
+                    err.message,
+                  );
+                  reject(
+                    new Error('Erreur lors de la vérification du compteur.'),
+                  );
+                } else if (row) {
+                  console.warn(
+                    `❌ Another counter (${row.counterID}) is already 'En Marche' for this consumer.`,
+                  );
+                  reject(
+                    new Error(
+                      'COUNTER EN MARCHE ALREADY EXISTS for this consumer',
+                    ),
+                  );
+                } else {
+                  // Proceed with updating the counter
+                  db.run(
+                    `UPDATE counter SET price = ?, status = ? WHERE counterID = ?`,
+                    [args.price, args.status, args.counterID],
+                    function (err) {
+                      if (err) {
+                        console.error(
+                          '❌ Database Error (Updating Counter):',
+                          err.message,
+                        );
+                        reject(
+                          new Error('Échec de la mise à jour du compteur.'),
+                        );
+                      } else if (this.changes === 0) {
+                        reject(new Error('Compteur introuvable.'));
+                      } else {
+                        resolve({
+                          message: 'Compteur mis à jour avec succès',
+                          success: true,
+                        });
+                      }
+                    },
+                  );
+                }
+              },
+            );
+          } else {
+            // Directly update for statuses other than "En Marche"
+            db.run(
+              `UPDATE counter SET price = ?, status = ? WHERE counterID = ?`,
+              [args.price, args.status, args.counterID],
+              function (err) {
+                if (err) {
+                  console.error(
+                    '❌ Database Error (Updating Counter):',
+                    err.message,
+                  );
+                  reject(new Error('Échec de la mise à jour du compteur.'));
+                } else if (this.changes === 0) {
+                  reject(new Error('Compteur introuvable.'));
+                } else {
+                  resolve({
+                    message: 'Compteur mis à jour avec succès',
+                    success: true,
+                  });
+                }
+              },
+            );
+          }
+        });
+      });
+    },
+
     addPayment: (_, { consumerID, invoiceID, paidAmount }) =>
       new Promise((resolve, reject) => {
         if (!db) return reject(new Error('Database connection is unavailable'));
 
+        // Step 1: Check if the invoice belongs to the given consumer
         db.get(
-          `SELECT amount, isPaid, debtID FROM invoice WHERE invoiceID = ?`,
+          `SELECT amount, isPaid, debtID, consumerID FROM invoice WHERE invoiceID = ?`,
           [invoiceID],
           (err, invoice) => {
             if (err) return reject(err);
             if (!invoice) return reject(new Error('Invoice not found'));
 
+            // 🔥 Validate if the invoice belongs to the consumer
+            if (invoice.consumerID !== consumerID) {
+              return reject(
+                new Error('Invoice does not belong to this consumer'),
+              );
+            }
+
             const { amount, isPaid, debtID } = invoice;
 
-            // Get total paid amount for the invoice
+            // Step 2: Get total paid amount for the invoice
             db.get(
               `SELECT COALESCE(SUM(paidAmount), 0) as totalPaid FROM payment WHERE invoiceID = ?`,
               [invoiceID],
@@ -502,6 +614,7 @@ export const resolvers = {
                   userID: 1,
                 };
 
+                // Step 3: Insert the payment
                 db.run(
                   `INSERT INTO payment (paymentID, paidAmount, createdAt, updatedAt, invoiceID, consumerID, userID) 
                          VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -517,7 +630,7 @@ export const resolvers = {
                   function (err) {
                     if (err) return reject(err);
 
-                    // Mark invoice as paid (even for partial payment)
+                    // Step 4: Mark invoice as paid (even for partial payment)
                     db.run(
                       `UPDATE invoice SET isPaid = 1, updatedAt = ? WHERE invoiceID = ?`,
                       [new Date().toISOString(), invoiceID],
@@ -525,7 +638,7 @@ export const resolvers = {
                         if (err) return reject(err);
 
                         if (debtID) {
-                          // If debt exists, update it instead of creating a new one
+                          // If debt exists, update it
                           db.run(
                             `UPDATE debt SET amount = ?, isPaid = ?, updatedAt = ? WHERE invoiceID = ?`,
                             [
@@ -593,31 +706,38 @@ export const resolvers = {
         );
       }),
 
-    addCounter(_, args) {
+    addCounter: (_, args) => {
       console.log('==>args', args);
 
       return new Promise((resolve, reject) => {
-        db.get(
+        db.all(
           `SELECT status FROM counter WHERE consumerID = ?`,
           [args.consumerID],
-          (err, row) => {
-            if (err) return reject({ message: 'Azul' });
-
-            if (row) {
-              if (row.status === 'En Marche') {
-                return reject(new Error('ACTIVE_COUNTER_EXISTS'));
-              }
-              return reject(new Error('DUPLICATE_COUNTER_ID'));
+          (err, rows) => {
+            if (err) {
+              console.error('Database Error:', err.message);
+              return reject(
+                new Error('Erreur lors de la vérification des compteurs.'),
+              );
             }
 
-            // If no counter exists or all are not "En Marche", proceed with insertion
+            // Check if any counter is "En Marche"
+            const hasActiveCounter = rows.some(
+              (row) => row.status === 'En Marche',
+            );
+
+            if (hasActiveCounter) {
+              return reject(new Error('ACTIVE_COUNTER_EXISTS'));
+            }
+
+            // Proceed with counter insertion
             const newCounter = {
               counterID: args.counterID,
               createdAt: new Date().toISOString(),
               userID: '1',
               price: args.price,
               consumerID: args.consumerID,
-              status: 'En Marche',
+              status: 'En Marche', // New counter starts as "En Marche"
             };
 
             db.run(
@@ -632,7 +752,12 @@ export const resolvers = {
                 newCounter.status,
               ],
               function (err) {
-                if (err) return reject(err);
+                if (err) {
+                  console.error('Database Insert Error:', err.message);
+                  return reject(
+                    new Error("Erreur lors de l'ajout du compteur."),
+                  );
+                }
                 resolve({ counterID: newCounter.counterID });
               },
             );
@@ -659,17 +784,18 @@ export const resolvers = {
             if (lastRecord) {
               oldRecord = lastRecord.newRecord;
 
+              // Prevent adding a new record if it's lower than the last recorded value
+              if (newRecord <= oldRecord) {
+                return reject(
+                  new Error(
+                    `INVALID_RECORD: New record (${newRecord}) must be greater than the last recorded value (${oldRecord}).`,
+                  ),
+                );
+              }
+
+              // If the period is the same, update the record
               if (lastRecord.period === period) {
-                // If the period is the same, update the record if newRecord is greater
-                if (newRecord > oldRecord) {
-                  isUpdating = true;
-                } else {
-                  return reject(
-                    new Error(
-                      `INVALID_RECORD: New record must be greater than the last record for the same consumer.`,
-                    ),
-                  );
-                }
+                isUpdating = true;
               }
             }
 
@@ -745,8 +871,8 @@ export const resolvers = {
 
                   db.run(
                     `INSERT INTO invoice 
-                     (invoiceID, amount, paymentCode, paymentDate, isPaid, isPrinted, createdAt, updatedAt, consumerID, debtID, recordID, userID) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                   (invoiceID, amount, paymentCode, paymentDate, isPaid, isPrinted, createdAt, updatedAt, consumerID, debtID, recordID, userID) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                       invoiceID,
                       totalAmount.toFixed(2),
@@ -875,18 +1001,90 @@ export const resolvers = {
 
     deleteConsumers: (_, { consumerIDs }) =>
       new Promise((resolve, reject) => {
+        console.log('==> consumerIDs', consumerIDs);
         if (!db.open) return reject(new Error('Database is closed'));
 
-        db.run(
-          `DELETE FROM consumer WHERE consumerID IN (${consumerIDs
-            .map(() => '?')
-            .join(', ')})`,
-          consumerIDs,
-          function (err) {
-            if (err) reject(err);
-            resolve(consumerIDs);
-          },
-        );
+        db.serialize(() => {
+          db.run('BEGIN TRANSACTION');
+
+          // Step 1: Delete related payments
+          db.run(
+            `DELETE FROM payment WHERE consumerID IN (${consumerIDs
+              .map(() => '?')
+              .join(', ')})`,
+            consumerIDs,
+            (err) => {
+              if (err) return rollbackAndReject(err);
+            },
+          );
+
+          // Step 2: Delete related debts
+          db.run(
+            `DELETE FROM debt WHERE consumerID IN (${consumerIDs
+              .map(() => '?')
+              .join(', ')})`,
+            consumerIDs,
+            (err) => {
+              if (err) return rollbackAndReject(err);
+            },
+          );
+
+          // Step 3: Delete related invoices
+          db.run(
+            `DELETE FROM invoice WHERE consumerID IN (${consumerIDs
+              .map(() => '?')
+              .join(', ')})`,
+            consumerIDs,
+            (err) => {
+              if (err) return rollbackAndReject(err);
+            },
+          );
+
+          // Step 4: Delete related records
+          db.run(
+            `DELETE FROM record WHERE consumerID IN (${consumerIDs
+              .map(() => '?')
+              .join(', ')})`,
+            consumerIDs,
+            (err) => {
+              if (err) return rollbackAndReject(err);
+            },
+          );
+
+          // Step 5: Delete related counters
+          db.run(
+            `DELETE FROM counter WHERE consumerID IN (${consumerIDs
+              .map(() => '?')
+              .join(', ')})`,
+            consumerIDs,
+            (err) => {
+              if (err) return rollbackAndReject(err);
+            },
+          );
+
+          // Step 6: Delete the consumers
+          db.run(
+            `DELETE FROM consumer WHERE consumerID IN (${consumerIDs
+              .map(() => '?')
+              .join(', ')})`,
+            consumerIDs,
+            function (err) {
+              if (err) return rollbackAndReject(err);
+
+              db.run('COMMIT', (err) => {
+                if (err) return reject(err);
+                resolve({
+                  success: true,
+                  message: 'Consommateurs supprimés avec succès',
+                });
+              });
+            },
+          );
+        });
+
+        function rollbackAndReject(error) {
+          db.run('ROLLBACK', () => reject(error));
+        }
       }),
 
     deleteCounters: (_, { counterIDs }) =>
@@ -900,7 +1098,7 @@ export const resolvers = {
           counterIDs,
           function (err) {
             if (err) reject(err);
-            resolve(counterIDs);
+            resolve({ success: true, message: 'Counters deleted' });
           },
         );
       }),

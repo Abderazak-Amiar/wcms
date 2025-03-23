@@ -49,6 +49,8 @@ function AddCounter() {
     onCompleted: (res) => {
       console.log('==>onCompleted', res);
       enqueueSnackbar('Compteur ajouté', { variant: 'success' });
+      refetch();
+      formik.resetForm();
     },
     onError: (err) => {
       console.log('==>error', err.message);

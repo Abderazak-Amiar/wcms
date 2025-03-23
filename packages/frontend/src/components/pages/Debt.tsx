@@ -107,7 +107,7 @@ function Debt() {
             variant="h4"
             sx={{ textAlign: 'center', marginBottom: 2 }}
           >
-            Dêtte du Consommateur
+            Dette du Consommateur
           </Typography>
 
           <form onSubmit={formik.handleSubmit}>
@@ -189,7 +189,7 @@ function Debt() {
                       <TableCell>{debt?.invoiceID}</TableCell>
                       <TableCell>{debt?.amount} DA</TableCell>
                       <TableCell>
-                        {moment(debt?.createdAt).format('DD MMM YYYY')}
+                        {moment(debt?.createdAt).format('DD MMM YYYY HH:mm')}
                       </TableCell>
                     </TableRow>
                   ))}

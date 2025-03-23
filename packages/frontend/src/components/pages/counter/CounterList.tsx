@@ -1,9 +1,17 @@
 import { useMutation, useQuery } from '@apollo/client';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import {
+  Autocomplete,
   Box,
+  Button,
   Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControlLabel,
   IconButton,
   Paper,
@@ -16,6 +24,7 @@ import {
   TablePagination,
   TableRow,
   TableSortLabel,
+  TextField,
   Toolbar,
   Tooltip,
   Typography,
@@ -23,8 +32,13 @@ import {
 import { alpha } from '@mui/material/styles';
 import { visuallyHidden } from '@mui/utils';
 import moment from 'moment';
+import { enqueueSnackbar } from 'notistack';
 import React, { useEffect, useState } from 'react';
-import { deleteCounters, getCounters } from '../../../api/apollo'; // Update imports
+import {
+  deleteCounters,
+  getCounters,
+  updateCounter,
+} from '../../../api/apollo'; // Update imports
 
 interface Counter {
   counterID: string;
@@ -43,13 +57,10 @@ function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
   return 0;
 }
 
-function getComparator<Key extends keyof any>(
+function getComparator<Key extends keyof Counter>(
   order: Order,
   orderBy: Key,
-): (
-  a: { [key in Key]: string | number },
-  b: { [key in Key]: string | number },
-) => number {
+): (a: Counter, b: Counter) => number {
   return order === 'desc'
     ? (a, b) => descendingComparator(a, b, orderBy)
     : (a, b) => -descendingComparator(a, b, orderBy);
@@ -154,6 +165,7 @@ function EnhancedTableHead(props: EnhancedTableProps) {
             </TableSortLabel>
           </TableCell>
         ))}
+        <TableCell align="right">Actions</TableCell>
       </TableRow>
     </TableHead>
   );
@@ -165,6 +177,7 @@ interface EnhancedTableToolbarProps {
   counters: Counter[];
   setCounters: React.Dispatch<React.SetStateAction<Counter[]>>;
   refetchCounters: () => void;
+  setDeleteConfirmationOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const EnhancedTableToolbar = ({
@@ -173,38 +186,8 @@ const EnhancedTableToolbar = ({
   counters,
   setCounters,
   refetchCounters,
+  setDeleteConfirmationOpen,
 }: EnhancedTableToolbarProps) => {
-  const [deleteCounter, { loading, error }] = useMutation(deleteCounters);
-
-  const handleDelete = async (counterIDs: string[]) => {
-    if (!counterIDs || counterIDs.length === 0) {
-      console.error('No counters selected for deletion');
-      return;
-    }
-
-    try {
-      // Optimistic update
-      console.log('==>counterIDs', counterIDs);
-      const newCounters = counters.filter(
-        (counter) => !counterIDs.includes(counter.counterID),
-      );
-      setCounters(newCounters);
-
-      // Perform the mutation
-      const response = await deleteCounter({
-        variables: { counterID: counterIDs },
-      });
-
-      // Refetch the data
-      refetchCounters();
-
-      console.log('Counters deleted:', response.data.deleteCounters);
-    } catch (err) {
-      console.error('Error deleting counters:', err);
-      setCounters(counters); // Restore the counters list if deletion fails
-    }
-  };
-
   return (
     <Toolbar
       sx={{
@@ -235,7 +218,10 @@ const EnhancedTableToolbar = ({
       )}
       {numSelected > 0 ? (
         <Tooltip title="Delete">
-          <IconButton onClick={() => handleDelete(selected)} disabled={loading}>
+          <IconButton
+            onClick={() => setDeleteConfirmationOpen(true)}
+            disabled={false}
+          >
             <DeleteIcon />
           </IconButton>
         </Tooltip>
@@ -250,6 +236,90 @@ const EnhancedTableToolbar = ({
   );
 };
 
+interface EditDialogProps {
+  open: boolean;
+  onClose: () => void;
+  counter: Counter | null;
+  onSave: (counter: Counter) => void;
+}
+
+const EditDialog = ({ open, onClose, counter, onSave }: EditDialogProps) => {
+  const [editedCounter, setEditedCounter] = useState<Counter | null>(counter);
+
+  useEffect(() => {
+    setEditedCounter(counter);
+  }, [counter]);
+
+  const handleChange = (field: keyof Counter, value: string) => {
+    if (editedCounter) {
+      setEditedCounter({ ...editedCounter, [field]: value });
+    }
+  };
+
+  const handleSave = () => {
+    if (editedCounter) {
+      onSave(editedCounter);
+    }
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose}>
+      <DialogTitle>Mettre à jour Compteur</DialogTitle>
+      <DialogContent>
+        <Autocomplete
+          options={['En Marche', 'En Arrêt', 'Coupé']}
+          value={editedCounter?.status || ''}
+          onChange={(event, newValue) => handleChange('status', newValue || '')}
+          renderInput={(params) => (
+            <TextField {...params} label="Status" margin="dense" fullWidth />
+          )}
+        />
+        <TextField
+          margin="dense"
+          label="Prix"
+          fullWidth
+          value={editedCounter?.price || ''}
+          onChange={(e) => handleChange('price', e.target.value)}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Annuler</Button>
+        <Button onClick={handleSave}>Enregistrer</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+interface DeleteConfirmationDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+const DeleteConfirmationDialog = ({
+  open,
+  onClose,
+  onConfirm,
+}: DeleteConfirmationDialogProps) => {
+  return (
+    <Dialog open={open} onClose={onClose}>
+      <DialogTitle>Delete Counters</DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          Are you sure you want to delete the selected counters?
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onConfirm} color="error">
+          Delete
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 export default function CounterList() {
   const { loading, error, data, refetch } = useQuery(getCounters);
   const [counters, setCounters] = useState<Counter[]>([]);
@@ -259,6 +329,23 @@ export default function CounterList() {
   const [page, setPage] = useState(0);
   const [dense, setDense] = useState(false);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
+  const [currentCounter, setCurrentCounter] = useState<Counter | null>(null);
+
+  const [deleteCounterMutation] = useMutation(deleteCounters, {
+    onCompleted: () => {
+      enqueueSnackbar('Compteur(s) supprimé(s)', {
+        variant: 'success',
+      });
+      refetch();
+      setSelected([]);
+      setDeleteConfirmationOpen(false);
+    },
+    onError: () => {
+      enqueueSnackbar('Erreur de suppression', { variant: 'error' });
+    },
+  });
 
   useEffect(() => {
     if (data?.counters) {
@@ -322,6 +409,76 @@ export default function CounterList() {
     setDense(event.target.checked);
   };
 
+  const handleEdit = (counter: Counter) => {
+    setCurrentCounter(counter);
+    setEditDialogOpen(true);
+  };
+
+  const [updateCounterMutation] = useMutation(updateCounter, {
+    onCompleted: (data) => {
+      if (data.updateCounter.success) {
+        enqueueSnackbar('Compteur mis à jour avec succès', {
+          variant: 'success',
+          style: { fontSize: '18px' },
+        });
+        refetch();
+      }
+    },
+    onError: (error) => {
+      if (
+        error.message.includes(
+          'COUNTER EN MARCHE ALREADY EXISTS for this consumer',
+        )
+      ) {
+        enqueueSnackbar('Possède un compteur en marche', {
+          variant: 'warning',
+          style: { fontSize: '18px' },
+        });
+      }
+    },
+  });
+
+  const handleSave = (counter: Counter) => {
+    if (!counter) return;
+
+    updateCounterMutation({
+      variables: {
+        counterID: counter.counterID,
+        price: counter.price,
+        status: counter.status,
+        consumerID: counter.consumerID,
+      },
+    });
+  };
+
+  const handleDelete = async () => {
+    if (!selected || selected.length === 0) {
+      console.error('No counters selected for deletion');
+      return;
+    }
+
+    try {
+      // Perform the mutation
+      const response = await deleteCounterMutation({
+        variables: { counterIDs: selected },
+      });
+
+      // Optimistic update
+      const newCounters = counters.filter(
+        (counter) => !selected.includes(counter.counterID),
+      );
+      setCounters(newCounters);
+      setSelected([]);
+
+      // Refetch the data
+      refetchCounters();
+
+      console.log('Counters deleted:', response.data.deleteCounters);
+    } catch (err) {
+      console.error('Error deleting counters:', err);
+    }
+  };
+
   const emptyRows =
     page > 0 ? Math.max(0, (1 + page) * rowsPerPage - counters.length) : 0;
 
@@ -332,11 +489,14 @@ export default function CounterList() {
         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
     [order, orderBy, page, rowsPerPage, counters],
   );
-
+  useEffect(() => {
+    refetchCounters();
+  }, []);
   if (loading) return <Typography>Loading...</Typography>;
   if (error)
     return <Typography color="error">Error: {error.message}</Typography>;
   console.log('==>visibleRows', visibleRows);
+
   return (
     <Box sx={{ width: '100%' }}>
       <Paper sx={{ width: '100%', mb: 2 }}>
@@ -346,6 +506,7 @@ export default function CounterList() {
           counters={counters}
           setCounters={setCounters}
           refetchCounters={refetchCounters}
+          setDeleteConfirmationOpen={setDeleteConfirmationOpen}
         />
         <TableContainer>
           <Table
@@ -385,13 +546,20 @@ export default function CounterList() {
                         }}
                       />
                     </TableCell>
-                    <TableCell align="left">{row.counterID}</TableCell>
-                    <TableCell align="left">{row.consumer.fullName}</TableCell>
-                    <TableCell align="left">{row.status}</TableCell>
+                    <TableCell align="left">{row?.counterID}</TableCell>
                     <TableCell align="left">
-                      {moment(row.createdAt).format('DD-MM-YYYY HH:mm:ss')}
+                      {row?.consumer?.fullName}
+                    </TableCell>
+                    <TableCell align="left">{row?.status}</TableCell>
+                    <TableCell align="left">
+                      {moment(row.createdAt).format('DD MMM YYYY HH:mm')}
                     </TableCell>
                     <TableCell align="right">{row.price}</TableCell>
+                    <TableCell align="right">
+                      <IconButton onClick={() => handleEdit(row)}>
+                        <EditIcon />
+                      </IconButton>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -401,7 +569,7 @@ export default function CounterList() {
                     height: (dense ? 33 : 53) * emptyRows,
                   }}
                 >
-                  <TableCell colSpan={6} />
+                  <TableCell colSpan={7} />
                 </TableRow>
               )}
             </TableBody>
@@ -421,6 +589,17 @@ export default function CounterList() {
       <FormControlLabel
         control={<Switch checked={dense} onChange={handleChangeDense} />}
         label="Marge dense"
+      />
+      <EditDialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        counter={currentCounter}
+        onSave={handleSave}
+      />
+      <DeleteConfirmationDialog
+        open={deleteConfirmationOpen}
+        onClose={() => setDeleteConfirmationOpen(false)}
+        onConfirm={handleDelete}
       />
     </Box>
   );

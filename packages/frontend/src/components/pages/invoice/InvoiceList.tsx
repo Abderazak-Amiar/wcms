@@ -5,11 +5,6 @@ import {
   Box,
   Button,
   Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   FormControl,
   Grid,
   IconButton,
@@ -39,6 +34,7 @@ import {
   UPDATE_INVOICE_PRINTED,
   getSettings,
 } from '../../../api/apollo';
+import DeleteConfirmationDialog from '../../molecules/DeleteConfirmationDialog';
 import InvoiceDetailsModal from './InvoiceDetailsModal';
 
 type Invoice = {
@@ -135,7 +131,7 @@ const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
           styles: { halign: 'center' },
         },
         {
-          content: moment(invoice?.createdAt).format('DD MMM YYYY'),
+          content: moment(invoice?.createdAt).format('DD MMM YYYY HH:mm'),
           styles: { halign: 'center' },
         },
       ],
@@ -184,8 +180,8 @@ const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
         { content: 'Nouveau Relevé:', styles: { fontStyle: 'bold' } },
       ],
       [
-        moment(invoice?.record?.recordDate).format('DD MMM YYYY'),
-        moment(invoice?.record?.nextRecordDate).format('DD MMM YYYY'),
+        moment(invoice?.record?.recordDate).format('DD MMM YYYY HH:mm'),
+        moment(invoice?.record?.nextRecordDate).format('DD MMM YYYY HH:mm'),
         `${invoice?.record?.oldRecord} m³` || '',
         `${invoice?.record?.newRecord} m³` || '',
       ],
@@ -303,31 +299,6 @@ const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
 
   return doc;
 };
-
-// Delete Confirmation Dialog Component
-const DeleteConfirmationDialog: React.FC<{
-  open: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}> = ({ open, onClose, onConfirm }) => (
-  <Dialog open={open} onClose={onClose}>
-    <DialogTitle>Confirmer la suppression</DialogTitle>
-    <DialogContent>
-      <DialogContentText>
-        Êtes-vous sûr de vouloir supprimer cette facture ? Cette action est
-        irréversible.
-      </DialogContentText>
-    </DialogContent>
-    <DialogActions>
-      <Button onClick={onClose} color="primary">
-        Annuler
-      </Button>
-      <Button onClick={onConfirm} color="error">
-        Supprimer
-      </Button>
-    </DialogActions>
-  </Dialog>
-);
 
 const InvoiceList: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -625,10 +596,10 @@ const InvoiceList: React.FC = () => {
                         onChange={() => handleSelect(item.invoiceID)}
                       />
                     </TableCell>
-                    <TableCell>{item.invoiceID.substring(0, 8)}</TableCell>
-                    <TableCell>{item.consumer.fullName}</TableCell>
-                    <TableCell>{item.amount}</TableCell>
-                    <TableCell>{item.record.period}</TableCell>
+                    <TableCell>{item?.invoiceID.substring(0, 8)}</TableCell>
+                    <TableCell>{item?.consumer?.fullName}</TableCell>
+                    <TableCell>{item?.amount}</TableCell>
+                    <TableCell>{item?.record?.period}</TableCell>
                     <TableCell>
                       {item?.isPaid
                         ? item?.debt?.isPaid === false
@@ -637,7 +608,7 @@ const InvoiceList: React.FC = () => {
                         : 'NP'}
                     </TableCell>
                     <TableCell>
-                      {moment(item.createdAt).format('DD-MMM-YYYY')}
+                      {moment(item.createdAt).format('DD MMM YYYY HH:mm')}
                     </TableCell>
                     <TableCell>
                       <IconButton
@@ -697,6 +668,8 @@ const InvoiceList: React.FC = () => {
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
+        message="Êtes-vous sûr de vouloir supprimer cette facture ? Cette action est
+          irréversible."
       />
     </Box>
   );
