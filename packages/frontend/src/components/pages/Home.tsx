@@ -56,7 +56,7 @@ function Home() {
         background: 'linear-gradient(135deg, #f5f7fa, #c3cfe2)',
       }}
     >
-      <Grid size={2} spacing={1}>
+      <Grid id="zak" size={2} spacing={1}>
         <Paper sx={{ height: '100vh' }}>
           {menuFr.map((item, index) => (
             <Link
@@ -80,7 +80,9 @@ function Home() {
           ))}
         </Paper>
       </Grid>
-      <Grid size={10} sx={{ background: '#ccc' }}>
+      <Grid
+        size={10}
+      >
         <Outlet />
       </Grid>
     </Grid>

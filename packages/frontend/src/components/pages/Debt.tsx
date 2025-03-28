@@ -57,7 +57,6 @@ function Debt() {
 
   // Fetch consumers
   const {
-    loading,
     error,
     data: consumersData,
   } = useQuery<{ consumers: Consumer[] }>(getConsumers);
@@ -100,7 +99,13 @@ function Debt() {
     ) || 0;
 
   return (
-    <Box sx={{ maxWidth: 600, margin: 'auto', padding: 3 }}>
+    <Box
+      sx={{
+        maxWidth: 600,
+        margin: 'auto',
+        padding: 3,
+      }}
+    >
       <Card elevation={3}>
         <CardContent>
           <Typography
@@ -123,7 +128,7 @@ function Debt() {
                     consumer.consumerID === formik.values.consumerID,
                 ) || null
               }
-              onChange={(event, newValue) => {
+              onChange={(_event, newValue) => {
                 formik.setFieldValue(
                   'consumerID',
                   newValue ? newValue.consumerID : '',
@@ -189,7 +194,7 @@ function Debt() {
                       <TableCell>{debt?.invoiceID}</TableCell>
                       <TableCell>{debt?.amount} DA</TableCell>
                       <TableCell>
-                        {moment(debt?.createdAt).format('DD MMM YYYY HH:mm')}
+                        {moment(debt?.createdAt).format('DD MMM YYYY')}
                       </TableCell>
                     </TableRow>
                   ))}

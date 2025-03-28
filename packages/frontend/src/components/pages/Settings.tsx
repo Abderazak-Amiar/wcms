@@ -16,7 +16,7 @@ type SettingsFormValues = {
 
 function AddSettings() {
   // Fetch existing settings
-  const { data, loading: loadingSettings } = useQuery(getSettings);
+  const { refetch, data, loading: loadingSettings } = useQuery(getSettings);
   // Set initial values based on fetched data or fallback to defaults
   const initialValues: SettingsFormValues = {
     m3price: data?.getSettings?.m3price || '',
@@ -41,6 +41,7 @@ function AddSettings() {
       enqueueSnackbar('Paramètres enregistrés avec succès', {
         variant: 'success',
       });
+      refetch();
     },
     onError: (err) => {
       console.error('==> error', err);
@@ -94,7 +95,7 @@ function AddSettings() {
           id="m3price"
           name="m3price"
           label="Prix par M³"
-          type='number'
+          type="number"
           value={formik.values.m3price}
           onChange={formik.handleChange}
           onBlur={formik.handleBlur}

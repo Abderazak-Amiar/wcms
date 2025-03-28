@@ -150,6 +150,7 @@ function EnhancedTableHead(props: EnhancedTableProps) {
             align={headCell.numeric ? 'right' : 'left'}
             padding={headCell.disablePadding ? 'none' : 'normal'}
             sortDirection={orderBy === headCell.id ? order : false}
+            sx={{ fontWeight: 'bold' }}
           >
             <TableSortLabel
               active={orderBy === headCell.id}
@@ -165,7 +166,9 @@ function EnhancedTableHead(props: EnhancedTableProps) {
             </TableSortLabel>
           </TableCell>
         ))}
-        <TableCell align="right">Actions</TableCell>
+        <TableCell sx={{ fontWeight: 'bold' }} align="right">
+          Actions
+        </TableCell>
       </TableRow>
     </TableHead>
   );
@@ -182,10 +185,6 @@ interface EnhancedTableToolbarProps {
 
 const EnhancedTableToolbar = ({
   numSelected,
-  selected,
-  counters,
-  setCounters,
-  refetchCounters,
   setDeleteConfirmationOpen,
 }: EnhancedTableToolbarProps) => {
   return (
@@ -212,7 +211,11 @@ const EnhancedTableToolbar = ({
           {numSelected} selected
         </Typography>
       ) : (
-        <Typography sx={{ flex: '1 1 100%' }} variant="h6" component="div">
+        <Typography
+          sx={{ flex: '1 1 100%', fontWeight: 'bold' }}
+          variant="h6"
+          component="div"
+        >
           Liste des compteurs
         </Typography>
       )}
@@ -270,7 +273,7 @@ const EditDialog = ({ open, onClose, counter, onSave }: EditDialogProps) => {
         <Autocomplete
           options={['En Marche', 'En Arrêt', 'Coupé']}
           value={editedCounter?.status || ''}
-          onChange={(event, newValue) => handleChange('status', newValue || '')}
+          onChange={(_event, newValue) => handleChange('status', newValue || '')}
           renderInput={(params) => (
             <TextField {...params} label="Status" margin="dense" fullWidth />
           )}
@@ -358,7 +361,7 @@ export default function CounterList() {
   };
 
   const handleRequestSort = (
-    event: React.MouseEvent<unknown>,
+    _event: React.MouseEvent<unknown>,
     property: keyof Counter,
   ) => {
     const isAsc = orderBy === property && order === 'asc';
@@ -375,7 +378,7 @@ export default function CounterList() {
     setSelected([]);
   };
 
-  const handleClick = (event: React.MouseEvent<unknown>, id: string) => {
+  const handleClick = (_event: React.MouseEvent<unknown>, id: string) => {
     const selectedIndex = selected.indexOf(id);
     let newSelected: string[] = [];
 
@@ -394,7 +397,7 @@ export default function CounterList() {
     setSelected(newSelected);
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
@@ -523,7 +526,7 @@ export default function CounterList() {
               rowCount={counters.length}
             />
             <TableBody>
-              {visibleRows.map((row, index) => {
+              {visibleRows.map((row) => {
                 const isItemSelected = selected.includes(row.counterID);
                 const labelId = `enhanced-table-checkbox-${row.counterID}`;
 
@@ -552,7 +555,7 @@ export default function CounterList() {
                     </TableCell>
                     <TableCell align="left">{row?.status}</TableCell>
                     <TableCell align="left">
-                      {moment(row.createdAt).format('DD MMM YYYY HH:mm')}
+                      {moment(row.createdAt).format('DD MMM YYYY')}
                     </TableCell>
                     <TableCell align="right">{row.price}</TableCell>
                     <TableCell align="right">

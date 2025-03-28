@@ -224,6 +224,8 @@ export const GET_INVOICES = gql`
       debt {
         isPaid
         amount
+        createdAt
+        invoiceID
       }
     }
   }
@@ -255,6 +257,8 @@ export const GET_INVOICE = gql`
       debt {
         isPaid
         amount
+        createdAt
+        invoiceID
       }
     }
   }

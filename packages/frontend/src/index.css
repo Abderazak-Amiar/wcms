@@ -18,15 +18,15 @@ body {
   background-color: white;
   padding: 64px;
   border-radius: 16px;
-  border: solid 3px #ccc;
+  border: solid 1px #ccc;
   text-align: center;
+  margin-top: 32px;
 }
 
 .login-form-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: transparent;
 }
 .water-icon {
   width: 50px !important;

@@ -2,7 +2,6 @@ import { useMutation, useQuery } from '@apollo/client';
 import { Autocomplete, Button, TextField, Typography } from '@mui/material';
 import { useFormik } from 'formik';
 import { enqueueSnackbar } from 'notistack';
-import { useEffect, useState } from 'react';
 import * as yup from 'yup';
 import { addCounter, getConsumers } from '../../../api/apollo';
 
@@ -24,7 +23,6 @@ function AddCounter() {
     price: '',
     consumerID: '',
   };
-  const [counter, setCounter] = useState<AddCounterFormValues>(initialValues);
 
   const validationSchema = yup.object({
     counterID: yup.string().required('Numéro compteur requis'),
@@ -41,11 +39,9 @@ function AddCounter() {
       submit({ variables: values });
     },
   });
-  useEffect(() => {
-    setCounter(formik.values);
-  }, [formik.values]);
 
-  const [submit, { loading, error, data }] = useMutation(addCounter, {
+
+  const [submit, { loading }] = useMutation(addCounter, {
     onCompleted: (res) => {
       console.log('==>onCompleted', res);
       enqueueSnackbar('Compteur ajouté', { variant: 'success' });
@@ -133,7 +129,7 @@ function AddCounter() {
             ) || null
           }
           onChange={(
-            event: React.SyntheticEvent,
+            _event: React.SyntheticEvent,
             newValue: Consumer | null,
           ) => {
             formik.setFieldValue(

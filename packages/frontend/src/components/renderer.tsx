@@ -8,7 +8,7 @@ interface Invoice {
 }
 
 function InvoicePrinter() {
-  const [invoices, setInvoices] = useState<Invoice[]>([
+  const [invoices] = useState<Invoice[]>([
     { id: 1, htmlContent: '<h2>Invoice #1</h2><p>Total: $100</p>' },
     { id: 2, htmlContent: '<h2>Invoice #2</h2><p>Total: $200</p>' },
   ]);

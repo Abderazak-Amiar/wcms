@@ -5,7 +5,7 @@ import ConsumerList from './ConsumerList';
 
 function Consumers() {
   return (
-    <Box>
+    <Box sx={{ background: 'linear-gradient(135deg, #f5f7fa, #c3cfe2)' }}>
       <BasicTabs
         labels={['List', 'Ajouter']}
         components={[<ConsumerList />, <AddConsumer />]}

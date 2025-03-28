@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
+  Autocomplete,
   Box,
   Button,
   Checkbox,
@@ -61,6 +62,8 @@ type Invoice = {
   debt: {
     isPaid: boolean;
     amount: string;
+    createdAt: string;
+    invoiceID: string;
   };
 };
 
@@ -122,6 +125,7 @@ const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
           styles: { fontStyle: 'bold', halign: 'center' },
         },
         { content: 'Date:', styles: { fontStyle: 'bold', halign: 'center' } },
+        { content: 'Status:', styles: { fontStyle: 'bold', halign: 'center' } },
       ],
       // Values Row (Normal)
       [
@@ -131,7 +135,15 @@ const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
           styles: { halign: 'center' },
         },
         {
-          content: moment(invoice?.createdAt).format('DD MMM YYYY HH:mm'),
+          content: moment(invoice?.createdAt).format('DD MMM YYYY'),
+          styles: { halign: 'center' },
+        },
+        {
+          content: invoice?.isPaid
+            ? invoice?.debt?.isPaid === false
+              ? 'PP'
+              : 'P'
+            : 'NP',
           styles: { halign: 'center' },
         },
       ],
@@ -180,8 +192,8 @@ const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
         { content: 'Nouveau Relevé:', styles: { fontStyle: 'bold' } },
       ],
       [
-        moment(invoice?.record?.recordDate).format('DD MMM YYYY HH:mm'),
-        moment(invoice?.record?.nextRecordDate).format('DD MMM YYYY HH:mm'),
+        moment(invoice?.record?.recordDate).format('DD MMM YYYY'),
+        moment(invoice?.record?.nextRecordDate).format('DD MMM YYYY'),
         `${invoice?.record?.oldRecord} m³` || '',
         `${invoice?.record?.newRecord} m³` || '',
       ],
@@ -240,7 +252,7 @@ const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
       ],
       [
         `${quantityConsumed.toString()} m³`,
-        `${Number(settings?.getSettings.m3price ?? 0).toFixed(2)}`,
+        `${Number(settings?.getSettings.m3price ?? 0).toFixed(2)} DA/m³`,
         Number(invoice?.amount ?? 0).toFixed(2) + ' DA',
       ],
     ],
@@ -252,30 +264,18 @@ const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
   autoTable(doc, {
     body: [
       [
-        {
-          content: 'Montant total:',
-          styles: { halign: 'right', fontSize: 14, fontStyle: 'bold' },
-        },
-        { content: invoice?.amount + ' DA', styles: { halign: 'right' } },
-      ],
-    ],
-    theme: 'grid',
-    styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
-  });
-
-  // Terms & Notes
-  autoTable(doc, {
-    body: [
-      [
-        {
-          content: 'Conditions & Remarques',
-          styles: { halign: 'left', fontSize: 14, fontStyle: 'bold' },
-        },
+        { content: 'Due', styles: { fontStyle: 'bold' } },
+        { content: 'Payé', styles: { fontStyle: 'bold' } },
       ],
       [
+        { content: invoice?.amount + ' DA', styles: { halign: 'left' } },
         {
           content:
-            "Veuillez, s'il vous plaît, vous approcher du bureau du comité du village afin de payer votre facture.\nVotre délai est de 15 jours. Nous vous remercions pour votre fidélité.",
+            invoice?.isPaid && !invoice?.debt?.isPaid
+              ? (
+                  Number(invoice?.amount) - Number(invoice?.debt?.amount)
+                ).toFixed(2)
+              : '0 DA',
           styles: { halign: 'left' },
         },
       ],
@@ -283,7 +283,53 @@ const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
     theme: 'grid',
     styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
   });
-
+  autoTable(doc, {
+    body: [
+      [
+        { content: 'Dette', styles: { fontStyle: 'bold' } },
+        { content: 'Date', styles: { fontStyle: 'bold' } },
+      ],
+      [
+        `${invoice?.debt?.amount ?? '0'} DA`,
+        `${moment(invoice?.debt?.createdAt).format('DD MMM YYYY')}`,
+      ],
+    ],
+    theme: 'grid',
+    styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
+  });
+  // Terms & Notes
+  autoTable(doc, {
+    body: [
+      [
+        {
+          content: 'Note',
+          styles: { halign: 'left', fontSize: 14, fontStyle: 'bold' },
+        },
+        {
+          content: 'Indication',
+          styles: { halign: 'left', fontSize: 14, fontStyle: 'bold' },
+        },
+      ],
+      [
+        {
+          content: `Veuillez, s'il vous plaît, vous approcher du bureau du comité du village\nafin de payer votre facture avant le ${moment(
+            invoice?.createdAt,
+          )
+            .add(settings.getSettings.deadline, 'days')
+            .format(
+              'DD MMM YYYY',
+            )}.\nNous vous remercions pour votre fidélité.`,
+          styles: { halign: 'left', fontStyle: 'bolditalic' },
+        },
+        {
+          content: 'Payée (P)\nPartielement Payée (PP)\nNon Payée (NP)',
+          styles: { halign: 'left', fontStyle: 'bolditalic' },
+        },
+      ],
+    ],
+    theme: 'grid',
+    styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
+  });
   // Footer
   autoTable(doc, {
     body: [
@@ -301,13 +347,16 @@ const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
 };
 
 const InvoiceList: React.FC = () => {
+  const [isPrintedFilter, setIsPrintedFilter] = useState<
+    boolean | 'all' | string
+  >('all');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
   const [consumerFilter, setConsumerFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid'>(
+  const [statusFilter, setStatusFilter] = useState<'all' | 'P' | 'PP' | 'NP'>(
     'all',
   );
 
@@ -343,6 +392,7 @@ const InvoiceList: React.FC = () => {
   const { refetch, loading, error, data } = useQuery<{ invoices: Invoice[] }>(
     GET_INVOICES,
   );
+  console.log('==>data', data);
   // Fetch Settings
   const {
     loading: loadingSettings,
@@ -397,22 +447,103 @@ const InvoiceList: React.FC = () => {
     }
   };
 
+  // const handlePrintInvoices = async () => {
+  //   if (selectedInvoices.length === 0) return;
+
+  //   const zip = new JSZip();
+
+  //   await Promise.all(
+  //     selectedInvoices.map(async (invoiceID) => {
+  //       const invoice = data?.invoices?.find(
+  //         (inv) => inv.invoiceID === invoiceID,
+  //       );
+  //       if (!invoice) return;
+  //       if (!dataSettings) return;
+  //       const doc = generateInvoicePDF(invoice, dataSettings);
+  //       const pdfBlob = doc.output('blob');
+  //       zip.file(`Facture_${invoice.invoiceID}.pdf`, pdfBlob);
+  //       await updateInvoicePrinted({ variables: { invoiceID } });
+  //     }),
+  //   );
+
+  //   const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+  //   // Save the ZIP file using Electron's file save dialog
+  //   if (window.electron) {
+  //     window.electron.savePDFs(zipBlob);
+  //   } else {
+  //     // Fallback for browser environment
+  //     saveAs(zipBlob, 'invoices.zip');
+  //   }
+
+  //   setSelectedInvoices([]);
+  //   refetch();
+  // };
+
+  // Filter invoices based on filter criteria
   const handlePrintInvoices = async () => {
     if (selectedInvoices.length === 0) return;
 
     const zip = new JSZip();
 
+    // Filter selected invoices based on current filters
+    const filteredInvoices = data?.invoices?.filter((invoice) => {
+      if (!selectedInvoices.includes(invoice.invoiceID)) return false;
+
+      // Apply the same filtering logic
+      if (statusFilter === 'P' && !invoice.isPaid) return false;
+      if (
+        statusFilter === 'PP' &&
+        (!invoice.debt || invoice.isPaid || invoice.debt.isPaid)
+      )
+        return false;
+      if (statusFilter === 'NP' && invoice.isPaid) return false;
+
+      if (
+        consumerFilter &&
+        !invoice.consumer.fullName
+          .toLowerCase()
+          .includes(consumerFilter.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (dateRangeFilter.start && dateRangeFilter.end) {
+        const invoiceDate = moment(invoice.createdAt);
+        const startDate = moment(dateRangeFilter.start);
+        const endDate = moment(dateRangeFilter.end);
+        if (!invoiceDate.isBetween(startDate, endDate, undefined, '[]')) {
+          return false;
+        }
+      }
+
+      if (periodFilter !== 'all' && invoice.record.period !== periodFilter) {
+        return false;
+      }
+
+      if (isPrintedFilter !== 'all' && invoice.isPrinted !== isPrintedFilter) {
+        return false;
+      }
+
+      return true;
+    });
+
+    console.log('Filtered Invoices:', filteredInvoices); // ✅ Print the filtered invoices
+
+    if (!filteredInvoices || filteredInvoices.length === 0) {
+      console.log('No invoices match the selected filters.');
+      return;
+    }
+
     await Promise.all(
-      selectedInvoices.map(async (invoiceID) => {
-        const invoice = data?.invoices?.find(
-          (inv) => inv.invoiceID === invoiceID,
-        );
-        if (!invoice) return;
+      filteredInvoices.map(async (invoice) => {
         if (!dataSettings) return;
         const doc = generateInvoicePDF(invoice, dataSettings);
         const pdfBlob = doc.output('blob');
         zip.file(`Facture_${invoice.invoiceID}.pdf`, pdfBlob);
-        await updateInvoicePrinted({ variables: { invoiceID } });
+        await updateInvoicePrinted({
+          variables: { invoiceID: invoice.invoiceID },
+        });
       }),
     );
 
@@ -420,9 +551,9 @@ const InvoiceList: React.FC = () => {
 
     // Save the ZIP file using Electron's file save dialog
     if (window.electron) {
+      // @ts-expect-error Property 'savePDFs' does not exist on type 'window.electron'
       window.electron.savePDFs(zipBlob);
     } else {
-      // Fallback for browser environment
       saveAs(zipBlob, 'invoices.zip');
     }
 
@@ -430,11 +561,17 @@ const InvoiceList: React.FC = () => {
     refetch();
   };
 
-  // Filter invoices based on filter criteria
-  const filteredInvoices = data?.invoices?.filter((invoice) => {
+  console.log('==>dataa', data);
+  const filteredInvoices = data?.invoices?.filter((invoice, index) => {
+    console.log('==>invoice?.debt?.isPaid', invoice?.debt?.isPaid, index);
     // Filter by status
-    if (statusFilter === 'paid' && !invoice.isPaid) return false;
-    if (statusFilter === 'unpaid' && invoice.isPaid) return false;
+
+    if (statusFilter === 'P' && !(invoice.isPaid && invoice?.debt?.isPaid))
+      return false;
+    if (statusFilter === 'PP' && !(invoice.isPaid && !invoice?.debt?.isPaid))
+      return false;
+
+    if (statusFilter === 'NP' && invoice.isPaid) return false;
 
     // Filter by consumer name
     if (
@@ -460,6 +597,9 @@ const InvoiceList: React.FC = () => {
     if (periodFilter !== 'all' && invoice.record.period !== periodFilter) {
       return false;
     }
+    if (isPrintedFilter !== 'all' && invoice.isPrinted !== isPrintedFilter) {
+      return false;
+    }
 
     return true;
   });
@@ -472,30 +612,45 @@ const InvoiceList: React.FC = () => {
     return (
       <Typography color="error">Error: {errorSettings.message}</Typography>
     );
+  const options = [
+    { label: 'Tous', value: 'all' },
+    { label: 'Imprimé', value: true },
+    { label: 'Non Imprimé', value: false },
+  ];
   return (
-    <Box sx={{ padding: 3 }}>
+    <Box
+      sx={{
+        background: 'linear-gradient(135deg, #f5f7fa, #c3cfe2)',
+        padding: 3,
+      }}
+    >
       {/* Filters Section */}
+
       <Paper sx={{ padding: 2, marginBottom: 3 }}>
         <Typography variant="h6" gutterBottom>
-          Filters
+          Filtres
         </Typography>
         <Grid container spacing={2}>
+          {/* Statut Filter */}
           <Grid item xs={12} sm={3}>
             <FormControl fullWidth variant="outlined" size="small">
               <InputLabel>Statut</InputLabel>
               <Select
                 value={statusFilter}
                 onChange={(e) =>
-                  setStatusFilter(e.target.value as 'all' | 'paid' | 'unpaid')
+                  setStatusFilter(e.target.value as 'all' | 'P' | 'PP' | 'NP')
                 }
                 label="Statut"
               >
                 <MenuItem value="all">Tous</MenuItem>
-                <MenuItem value="paid">Payé</MenuItem>
-                <MenuItem value="unpaid">Non Payé</MenuItem>
+                <MenuItem value="P">Payé</MenuItem>
+                <MenuItem value="PP">Partielement Payé</MenuItem>
+                <MenuItem value="NP">Non Payé</MenuItem>
               </Select>
             </FormControl>
           </Grid>
+
+          {/* Consumer Filter */}
           <Grid item xs={12} sm={3}>
             <TextField
               fullWidth
@@ -506,6 +661,8 @@ const InvoiceList: React.FC = () => {
               onChange={(e) => setConsumerFilter(e.target.value)}
             />
           </Grid>
+
+          {/* Period Filter */}
           <Grid item xs={12} sm={2}>
             <FormControl fullWidth variant="outlined" size="small">
               <InputLabel>Période</InputLabel>
@@ -523,6 +680,8 @@ const InvoiceList: React.FC = () => {
               </Select>
             </FormControl>
           </Grid>
+
+          {/* Date Range Filters */}
           <Grid item xs={12} sm={2}>
             <TextField
               fullWidth
@@ -554,6 +713,28 @@ const InvoiceList: React.FC = () => {
               }
             />
           </Grid>
+
+          {/* isPrinted Filter */}
+          <Grid item xs={12} sm={3}>
+            <FormControl fullWidth variant="outlined" size="small">
+  
+              <Autocomplete
+                value={
+                  options.find((option) => option.value === isPrintedFilter) ||
+                  null
+                }
+                onChange={(_, newValue) =>
+                  setIsPrintedFilter(newValue?.value ?? 'all')
+                }
+                options={options}
+                getOptionLabel={(option) => option.label}
+                renderInput={(params) => (
+                  <TextField {...params} label="Imprimé" />
+                )}
+              />
+              ;
+            </FormControl>
+          </Grid>
         </Grid>
       </Paper>
 
@@ -561,7 +742,7 @@ const InvoiceList: React.FC = () => {
       <Paper sx={{ padding: 2 }}>
         <TableContainer>
           <Table>
-            <TableHead>
+            <TableHead sx={{ '& th': { fontWeight: 'bold !important' } }}>
               <TableRow>
                 <TableCell>
                   <Checkbox
@@ -608,7 +789,7 @@ const InvoiceList: React.FC = () => {
                         : 'NP'}
                     </TableCell>
                     <TableCell>
-                      {moment(item.createdAt).format('DD MMM YYYY HH:mm')}
+                      {moment(item.createdAt).format('DD MMM YYYY')}
                     </TableCell>
                     <TableCell>
                       <IconButton
@@ -639,6 +820,7 @@ const InvoiceList: React.FC = () => {
               setRowsPerPage(parseInt(event.target.value, 10));
               setPage(0);
             }}
+            labelRowsPerPage="Lignes par page"
           />
         )}
       </Paper>
@@ -656,10 +838,11 @@ const InvoiceList: React.FC = () => {
       </Box>
 
       {/* Invoice Details Modal */}
-      {selectedInvoice && (
+      {selectedInvoice && dataSettings && (
         <InvoiceDetailsModal
           invoiceID={selectedInvoice}
           onClose={() => setSelectedInvoice(null)}
+          settings={dataSettings}
         />
       )}
 

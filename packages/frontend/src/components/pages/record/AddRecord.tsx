@@ -47,7 +47,7 @@ function AddRecord() {
 
   // Mutation pour ajouter un enregistrement
   const [submit, { loading }] = useMutation(addRecord, {
-    onCompleted: (res) => {
+    onCompleted: () => {
       enqueueSnackbar('Recensement fait avec succès', { variant: 'success' });
     },
     onError: (err) => {
@@ -124,7 +124,7 @@ function AddRecord() {
               (consumer) => consumer.consumerID === formik.values.consumerID,
             ) || null
           }
-          onChange={(event, newValue) => {
+          onChange={(_event, newValue) => {
             formik.setFieldValue(
               'consumerID',
               newValue ? newValue.consumerID : '',

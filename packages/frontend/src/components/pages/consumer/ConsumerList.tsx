@@ -143,6 +143,7 @@ function EnhancedTableHead(props: EnhancedTableProps) {
             align={headCell.numeric ? 'right' : 'left'}
             padding={headCell.disablePadding ? 'none' : 'normal'}
             sortDirection={orderBy === headCell.id ? order : false}
+            sx={{ fontWeight: 'bold' }}
           >
             {headCell.id !== 'actions' ? (
               <TableSortLabel
@@ -202,7 +203,11 @@ const EnhancedTableToolbar = ({
           {numSelected} selected
         </Typography>
       ) : (
-        <Typography sx={{ flex: '1 1 100%' }} variant="h6" component="div">
+        <Typography
+          sx={{ flex: '1 1 100%', fontWeight: 'bold' }}
+          variant="h6"
+          component="div"
+        >
           Liste des consommateurs
         </Typography>
       )}
@@ -245,7 +250,7 @@ export default function ConsumerList() {
   }, [data]);
 
   const handleRequestSort = (
-    event: React.MouseEvent<unknown>,
+    _event: React.MouseEvent<unknown>,
     property: keyof Consumer,
   ) => {
     const isAsc = orderBy === property && order === 'asc';
@@ -262,7 +267,7 @@ export default function ConsumerList() {
     setSelected([]);
   };
 
-  const handleClick = (event: React.MouseEvent<unknown>, id: string) => {
+  const handleClick = (_event: React.MouseEvent<unknown>, id: string) => {
     const selectedIndex = selected.indexOf(id);
     let newSelected: string[] = [];
 
@@ -281,7 +286,7 @@ export default function ConsumerList() {
     setSelected(newSelected);
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
@@ -421,7 +426,7 @@ export default function ConsumerList() {
                     </TableCell>
                     <TableCell align="left">{row.fullName}</TableCell>
                     <TableCell align="left">
-                      {moment(row.createdAt).format('DD MMM YYYY HH:mm')}
+                      {moment(row.createdAt).format('DD MMM YYYY')}
                     </TableCell>
                     <TableCell>
                       <IconButton
