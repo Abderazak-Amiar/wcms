@@ -16,12 +16,13 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   : RENDERER_DIST;
 
 let win: BrowserWindow | null;
+const pendingInvoices = new Set<string>();
 
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC as string, 'electron-vite.svg'),
     webPreferences: {
-      preload: path.join(app.getAppPath(), 'dist-electron', 'preload.mjs'), // ✅ Ensures absolute path
+      preload: path.join(app.getAppPath(), 'dist-electron', 'preload.mjs'),
       devTools: true,
       nodeIntegration: false,
       contextIsolation: true,
@@ -40,61 +41,64 @@ function createWindow() {
   }
 }
 
-// Handle silent printing
-ipcMain.on('print-invoices', async (event, invoiceIds: string[]) => {
+// ✅ Print invoices (Refactored)
+ipcMain.on('print-invoices', async (_event, invoiceIds: string[]) => {
   if (!win) return;
 
+  // Validate invoice IDs
+  if (
+    !Array.isArray(invoiceIds) ||
+    invoiceIds.some((id) => typeof id !== 'string')
+  ) {
+    console.error('Invalid invoice IDs received:', invoiceIds);
+    return;
+  }
+
   for (const invoiceId of invoiceIds) {
+    pendingInvoices.add(invoiceId);
     win.webContents.send('load-invoice', invoiceId);
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    win.webContents.print(
-      {
-        silent: true,
-        printBackground: true,
-        color: false,
-        copies: 1,
-        landscape: false,
-        margins: { marginType: 'default' },
-      },
-      (success) => {
-        if (!success) {
-          console.error(`Failed to print invoice ${invoiceId}`);
-        }
-      },
-    );
   }
 });
 
-// Handle PDF saving
-ipcMain.on('export-invoices-pdf', async (event, invoiceIds: string[]) => {
-  if (!win) return;
+// ✅ Renderer confirms when an invoice is ready
+ipcMain.on('invoice-ready', (_event, invoiceId) => {
+  if (!win || !pendingInvoices.has(invoiceId)) return;
 
-  for (const invoiceId of invoiceIds) {
-    win.webContents.send('load-invoice', invoiceId);
+  console.log(`Printing invoice: ${invoiceId}`);
+  win.webContents.print(
+    {
+      silent: true,
+      printBackground: true,
+      color: false,
+      copies: 1,
+      landscape: false,
+      margins: { marginType: 'default' },
+    },
+    (success) => {
+      if (success) {
+        console.log(`Printed invoice ${invoiceId} successfully.`);
+      } else {
+        console.error(`Failed to print invoice ${invoiceId}.`);
+      }
+      pendingInvoices.delete(invoiceId);
+    },
+  );
+});
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+// ✅ Save PDF invoices (Fixed Buffer issue)
+ipcMain.handle('save-pdfs', async (_event, zipBuffer: Buffer) => {
+  const { filePath } = await dialog.showSaveDialog({
+    title: 'Save Invoices',
+    defaultPath: path.join(app.getPath('documents'), 'invoices.zip'),
+    filters: [{ name: 'ZIP Files', extensions: ['zip'] }],
+  });
 
-    const pdfPath = path.join(
-      app.getPath('documents'),
-      `invoice_${invoiceId}.pdf`,
-    );
-
-    try {
-      const pdfData = await win.webContents.printToPDF({
-        margins: { marginType: 'default' },
-        printBackground: true,
-        landscape: false,
-        pageSize: 'A4',
-      });
-
-      fs.writeFileSync(pdfPath, pdfData);
-      console.log(`Saved: ${pdfPath}`);
-    } catch (error) {
-      console.error(`Failed to save PDF for invoice ${invoiceId}:`, error);
-    }
+  if (filePath) {
+    fs.writeFileSync(filePath, zipBuffer); // ✅ Write Buffer correctly
+    return true;
   }
+
+  return false;
 });
 
 app.on('window-all-closed', () => {
@@ -102,7 +106,6 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
-console.log('Preload script path:', path.join(app.getAppPath(), 'dist-electron', 'preload.mjs'));
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
@@ -111,18 +114,3 @@ app.on('activate', () => {
 });
 
 app.whenReady().then(createWindow);
-
-ipcMain.handle('save-pdfs', async (event, zipBlob) => {
-  const { filePath } = await dialog.showSaveDialog({
-    title: 'Save Invoices',
-    defaultPath: path.join(__dirname, 'invoices.zip'),
-    filters: [{ name: 'ZIP Files', extensions: ['zip'] }],
-  });
-
-  if (filePath) {
-    fs.writeFileSync(filePath, Buffer.from(zipBlob));
-    return true;
-  }
-
-  return false;
-});
