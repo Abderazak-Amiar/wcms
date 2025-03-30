@@ -20,7 +20,13 @@ await server.start();
 app.use(
   '/graphql',
 
-  cors({ origin: ['http://localhost:4000/graphql','http://localhost:5173'] }),
+  cors({
+    origin: [
+      'http://localhost:4000/graphql',
+      'http://localhost:5173',
+      'http://localhost:4173',
+    ],
+  }),
 
   express.json(),
   expressMiddleware(server),
