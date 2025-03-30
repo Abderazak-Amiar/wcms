@@ -1,14 +1,26 @@
+import fs from 'fs';
+import path from 'path';
 import process from 'process';
 import sqlite3 from 'sqlite3';
 
+// Define the database file path
+const dbPath = path.join('C:', 'ProgramData', 'wcms', 'wcms.db');
+
+// Ensure the directory exists
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+// Connect to SQLite database
 export const db = new sqlite3.Database(
-  './wcms.db',
+  dbPath,
   sqlite3.OPEN_READWRITE | sqlite3.OPEN_FULLMUTEX, // Full mutex mode for concurrency safety
   (err) => {
     if (err) {
       console.error('❌ Database Connection Error:', err.message);
     } else {
-      console.log('✅ Connected to the SQLite database.');
+      console.log(`✅ Connected to the SQLite database: ${dbPath}`);
     }
   },
 );
