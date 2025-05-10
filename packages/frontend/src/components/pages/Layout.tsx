@@ -32,7 +32,7 @@ function Layout() {
   ];
   const menuFr = [
     'Recensement',
-    'Consomateur',
+    'Consommateur',
     'Compteur',
     'Facture',
     'Paiement',

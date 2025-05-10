@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { Autocomplete, Button, TextField, Typography } from '@mui/material';
 import { useFormik } from 'formik';
 import { enqueueSnackbar } from 'notistack';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as yup from 'yup';
 import { addRecord, getConsumers } from '../../../api/apollo';
 import { getCurrentTrimester } from '../../../helpers/getCurrentTrimester';
@@ -28,6 +28,8 @@ type AddRecordFormValues = {
 };
 
 function AddRecord() {
+  const [hasCounter, setHasCounter] = useState(false);
+  const [isConsumerSelected, setIsConsumerSelected] = useState(false);
   const initialValues: AddRecordFormValues = {
     consumerID: '',
     counterID: '',
@@ -78,7 +80,7 @@ function AddRecord() {
     error: queryError,
     data: consumersData,
   } = useQuery<{ consumers: Consumer[] }>(getConsumers);
-
+  console.log('==>consumersData', consumersData);
   // Affichage d'une notification en cas d'erreur de requête
   useEffect(() => {
     if (queryError) {
@@ -91,7 +93,6 @@ function AddRecord() {
 
   const consumers = consumersData?.consumers ?? [];
 
-  // Formik pour gérer le formulaire
   const formik = useFormik<AddRecordFormValues>({
     initialValues,
     validationSchema,
@@ -132,6 +133,12 @@ function AddRecord() {
             ) || null
           }
           onChange={(_event, newValue) => {
+            setIsConsumerSelected(true);
+            console.log('==>newValue', newValue);
+            newValue?.counters.length === 0
+              ? setHasCounter(false)
+              : setHasCounter(true);
+
             formik.setFieldValue(
               'consumerID',
               newValue ? newValue.consumerID : '',
@@ -171,7 +178,11 @@ function AddRecord() {
           helperText={formik.touched.newRecord && formik.errors.newRecord}
           sx={{ marginBlock: '8px' }}
         />
-
+        {isConsumerSelected && !hasCounter && (
+          <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+            Aucun compteur associé à ce consommateur
+          </Typography>
+        )}
         <Button
           sx={{ marginBlock: '8px' }}
           color="primary"

@@ -30,7 +30,7 @@ function Home() {
   ];
   const menuFr = [
     'Recensement',
-    'Consomateur',
+    'Consommateur',
     'Compteur',
     'Facture',
     'Paiement',

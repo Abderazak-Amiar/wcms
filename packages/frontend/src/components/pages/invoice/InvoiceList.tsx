@@ -560,23 +560,27 @@ const InvoiceList: React.FC = () => {
 
         const doc = generateInvoicePDF(invoice, dataSettings, debts);
         const pdfBlob = doc.output('blob');
-        zip.file(`Facture_${invoice.invoiceID}.pdf`, pdfBlob);
+        zip.file(`Facture_${invoice?.consumer?.fullName}.pdf`, pdfBlob);
 
         await updateInvoicePrinted({
           variables: { invoiceID: invoice.invoiceID },
         });
       }),
     );
+    const zipArrayBuffer = await zip.generateAsync({ type: 'arraybuffer' });
+    const zipFileName = `${getCurrentTrimesterFr()}_${new Date().getFullYear()}.zip`;
 
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
-    const currentPeriod = getCurrentTrimesterFr();
-    const currentYear = new Date().getFullYear();
-    // Save the ZIP file using Electron's file save dialog
     if (window.electron) {
-      // @ts-expect-error Property 'savePDFs' does not exist on type 'window.electron'
-      window.electron.savePDFs(zipBlob);
+      // Electron — send raw buffer + filename
+      // @ts-expect-error: custom API exposed in preload
+      window.electron.savePDFs(
+        new Blob([zipArrayBuffer], { type: 'application/zip' }),
+        zipFileName,
+      );
     } else {
-      saveAs(zipBlob, `${currentPeriod}_${currentYear}`);
+      // Browser — wrap buffer in a real Blob
+      const blob = new Blob([zipArrayBuffer], { type: 'application/zip' });
+      saveAs(blob, zipFileName);
     }
 
     setSelectedInvoices([]);
