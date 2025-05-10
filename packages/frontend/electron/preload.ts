@@ -1,9 +1,29 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electron', {
-  send: (channel: string, data: any) => ipcRenderer.send(channel, data),
-  on: (channel: string, func: (...args: any[]) => void) => {
-    ipcRenderer.on(channel, (event, ...args) => func(...args));
+  send: (channel: string, data?: unknown) => ipcRenderer.send(channel, data),
+  on: (channel: string, callback: (...args: any[]) => void) => {
+    ipcRenderer.on(channel, (_event, ...args) => callback(...args));
   },
-  savePDFs: (zipBlob: Blob) => ipcRenderer.invoke('save-pdfs', zipBlob), // Expose savePDFs
+  off: (channel: string, callback: (...args: any[]) => void) => {
+    ipcRenderer.removeListener(channel, callback);
+  },
+
+  // ✅ Structured cloning for invoice IDs
+  printInvoices: (invoiceIds: string[]) => {
+    if (
+      !Array.isArray(invoiceIds) ||
+      invoiceIds.some((id) => typeof id !== 'string')
+    ) {
+      console.error('Invalid invoiceIds:', invoiceIds);
+      return;
+    }
+    ipcRenderer.send('print-invoices', invoiceIds);
+  },
+
+  // ✅ Properly handle Blob to Buffer conversion
+  savePDFs: async (zipBlob: Blob) => {
+    const arrayBuffer = await zipBlob.arrayBuffer(); // Convert Blob to ArrayBuffer
+    return ipcRenderer.invoke('save-pdfs', Buffer.from(arrayBuffer)); // Convert to Buffer
+  },
 });

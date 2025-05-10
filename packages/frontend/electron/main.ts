@@ -1,33 +1,37 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import fs from 'fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 process.env.APP_ROOT = path.join(__dirname, '..');
-// In your main process (e.g., main.ts)
-import { dialog } from 'electron';
-export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
+
+export const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
-
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
   : RENDERER_DIST;
 
 let win: BrowserWindow | null;
+const pendingInvoices = new Set<string>();
 
-function createWindow() {
+function createWindow(): void {
   win = new BrowserWindow({
+    show: false, // Hide initially to avoid flicker during resize
+    minimizable: true,
     icon: path.join(process.env.VITE_PUBLIC as string, 'electron-vite.svg'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
-      devTools: false,
-      nodeIntegration: true, // Ensure node integration for IPC
-      contextIsolation: false,
+      preload: path.join(app.getAppPath(), 'dist-electron', 'preload.mjs'),
+      devTools: true,
+      nodeIntegration: false,
+      contextIsolation: true,
     },
-    transparent: true,
+  });
+
+  win.once('ready-to-show', () => {
+    win?.maximize(); // ✅ Fill screen but keep taskbar visible
+    win?.show();
   });
 
   win.webContents.on('did-finish-load', () => {
@@ -40,124 +44,86 @@ function createWindow() {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'));
   }
 
-  const template: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'delete' },
-        { type: 'separator' },
-        { role: 'selectAll' },
-      ],
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
-      ],
-    },
-    {
-      label: 'Window',
-      submenu: [{ role: 'minimize' }, { role: 'close' }],
-    },
-  ];
-
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
+  win.on('closed', () => {
+    win = null;
+  });
 }
 
-// Handle silent printing
-ipcMain.on('print-invoices', async (event, invoiceIds: string[]) => {
+/** ✅ Print Invoices */
+ipcMain.on('print-invoices', async (_event, invoiceIds: string[]) => {
   if (!win) return;
 
-  for (const invoiceId of invoiceIds) {
-    win.webContents.send('load-invoice', invoiceId); // Ask renderer to load invoice
-
-    // Wait for the invoice to load (adjust delay if needed)
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    win.webContents.print(
-      {
-        silent: true, // No confirmation dialog
-        printBackground: true,
-        color: false,
-        copies: 1,
-        landscape: false,
-        margins: { marginType: 'default' },
-      },
-      (success) => {
-        if (!success) {
-          console.error(`Failed to print invoice ${invoiceId}`);
-        }
-      },
-    );
+  if (
+    !Array.isArray(invoiceIds) ||
+    invoiceIds.some((id) => typeof id !== 'string')
+  ) {
+    console.error('❌ Invalid invoice IDs received:', invoiceIds);
+    return;
   }
-});
-
-// Handle PDF saving
-ipcMain.on('export-invoices-pdf', async (event, invoiceIds: string[]) => {
-  if (!win) return;
 
   for (const invoiceId of invoiceIds) {
+    pendingInvoices.add(invoiceId);
     win.webContents.send('load-invoice', invoiceId);
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    const pdfPath = path.join(
-      app.getPath('documents'),
-      `invoice_${invoiceId}.pdf`,
-    );
-    const pdfData = await win.webContents.printToPDF({
-      margins: { marginType: 'default' },
-      printBackground: true,
-      landscape: false,
-      pageSize: 'A4',
-    });
-
-    fs.writeFileSync(pdfPath, pdfData);
-    console.log(`Saved: ${pdfPath}`);
   }
 });
 
+/** ✅ Renderer confirms invoice is ready */
+ipcMain.on('invoice-ready', (_event, invoiceId) => {
+  if (!win || !pendingInvoices.has(invoiceId)) return;
+
+  console.log(`🖨️ Printing invoice: ${invoiceId}`);
+  win.webContents.print(
+    {
+      silent: true,
+      printBackground: true,
+      color: false,
+      copies: 1,
+      landscape: false,
+      margins: { marginType: 'default' },
+    },
+    (success) => {
+      if (success) {
+        console.log(`✅ Printed invoice ${invoiceId} successfully.`);
+      } else {
+        console.error(`❌ Failed to print invoice ${invoiceId}.`);
+      }
+      pendingInvoices.delete(invoiceId);
+    },
+  );
+});
+
+/** ✅ Save PDF invoices */
+ipcMain.handle('save-pdfs', async (_event, zipBuffer: Buffer) => {
+  const { filePath } = await dialog.showSaveDialog({
+    title: 'Save Invoices',
+    defaultPath: path.join(app.getPath('documents'), 'invoices.zip'),
+    filters: [{ name: 'ZIP Files', extensions: ['zip'] }],
+  });
+
+  if (filePath) {
+    fs.writeFileSync(filePath, zipBuffer);
+    return true;
+  }
+  return false;
+});
+
+/** ✅ Lifecycle Hooks */
+
+// Stop API when app is closed
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
-    win = null;
   }
 });
 
+// Recreate window on MacOS when clicking app icon
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
 });
 
-app.whenReady().then(createWindow);
-
-ipcMain.handle('save-pdfs', async (event, zipBlob) => {
-  const { filePath } = await dialog.showSaveDialog({
-    title: 'Save Invoices',
-    defaultPath: path.join(__dirname, 'invoices.zip'),
-    filters: [{ name: 'ZIP Files', extensions: ['zip'] }],
-  });
-
-  // Check if filePath is defined
-  if (filePath) {
-    fs.writeFileSync(filePath, Buffer.from(zipBlob));
-    return true; // Indicate success
-  }
-
-  return false; // Indicate cancellation or failure
+// ✅ Start API when Electron starts
+app.whenReady().then(() => {
+  createWindow();
 });

@@ -14,12 +14,13 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { useFormik } from 'formik';
 import moment from 'moment';
 import { enqueueSnackbar } from 'notistack';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import * as yup from 'yup';
 import { getConsumers, getDebtsByConsumer } from '../../api/apollo';
 
@@ -47,6 +48,16 @@ type AddRecordFormValues = {
 };
 
 function Debt() {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const handleCopy = async (id: string) => {
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 5000);
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  };
   const initialValues: AddRecordFormValues = {
     consumerID: '',
   };
@@ -55,11 +66,9 @@ function Debt() {
     consumerID: yup.string().required('Consommateur requis'),
   });
 
-  // Fetch consumers
-  const {
-    error,
-    data: consumersData,
-  } = useQuery<{ consumers: Consumer[] }>(getConsumers);
+  const { error, data: consumersData } = useQuery<{ consumers: Consumer[] }>(
+    getConsumers,
+  );
 
   useEffect(() => {
     if (error) {
@@ -80,7 +89,6 @@ function Debt() {
     },
   });
 
-  // Fetch debts
   const {
     loading: debtsLoading,
     error: debtsError,
@@ -91,12 +99,13 @@ function Debt() {
     skip: !formik.values.consumerID,
   });
 
-  // Calculate total debt
+  const filteredDebts =
+    debtsData?.getDebtsByConsumer.filter(
+      (debt) => parseFloat(debt.amount) > 0,
+    ) ?? [];
+
   const totalDebt =
-    debtsData?.getDebtsByConsumer?.reduce(
-      (sum, debt) => sum + parseFloat(debt.amount),
-      0,
-    ) || 0;
+    filteredDebts.reduce((sum, debt) => sum + parseFloat(debt.amount), 0) || 0;
 
   return (
     <Box
@@ -159,7 +168,6 @@ function Debt() {
             />
           </form>
 
-          {/* Display debts */}
           {debtsLoading && (
             <Box
               sx={{ display: 'flex', justifyContent: 'center', marginTop: 2 }}
@@ -172,7 +180,7 @@ function Debt() {
             <Alert severity="error">Erreur de chargement des dettes</Alert>
           )}
 
-          {debtsData?.getDebtsByConsumer?.length ? (
+          {filteredDebts.length > 0 ? (
             <TableContainer component={Paper} sx={{ marginTop: 2 }}>
               <Table>
                 <TableHead>
@@ -189,16 +197,36 @@ function Debt() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {debtsData.getDebtsByConsumer.map((debt) => (
+                  {filteredDebts.map((debt) => (
                     <TableRow key={debt?.debtID}>
-                      <TableCell>{debt?.invoiceID}</TableCell>
+                      <Tooltip
+                        title={
+                          copiedId === debt?.invoiceID
+                            ? 'Copié'
+                            : 'Cliquer pour copier'
+                        }
+                        arrow
+                      >
+                        <TableCell
+                          onClick={() => handleCopy(debt?.invoiceID)}
+                          sx={{
+                            fontFamily: 'monospace',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                            '&:hover': {
+                              fontWeight: 'bold',
+                            },
+                          }}
+                        >
+                          {debt?.invoiceID}
+                        </TableCell>
+                      </Tooltip>
                       <TableCell>{debt?.amount} DA</TableCell>
                       <TableCell>
                         {moment(debt?.createdAt).format('DD MMM YYYY')}
                       </TableCell>
                     </TableRow>
                   ))}
-                  {/* Total Debt Row */}
                   <TableRow>
                     <TableCell
                       colSpan={2}

@@ -48,11 +48,11 @@ function LoginForm() {
   if (error) {
     console.log('==>error', error);
   }
-  console.log('==>data', data?.userLogin);
+
   useEffect(() => {
     if (data?.userLogin) {
       localStorage.setItem('token', data.userLogin.userID);
-      navigate('/home');
+      navigate('/welcome');
     }
   }, [data, navigate]);
 
