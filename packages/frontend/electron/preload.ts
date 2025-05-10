@@ -22,8 +22,8 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   // ✅ Properly handle Blob to Buffer conversion
-  savePDFs: async (zipBlob: Blob) => {
+  savePDFs: async (zipBlob: Blob, fileName: string) => {
     const arrayBuffer = await zipBlob.arrayBuffer(); // Convert Blob to ArrayBuffer
-    return ipcRenderer.invoke('save-pdfs', Buffer.from(arrayBuffer)); // Convert to Buffer
+    return ipcRenderer.invoke('save-pdfs', Buffer.from(arrayBuffer), fileName); // Pass filename
   },
 });

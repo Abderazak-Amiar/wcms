@@ -15,7 +15,7 @@ function AddConsumer() {
   const [consumer, setConsumer] = useState<addConsumerType>(initialValues);
 
   const validationSchema = yup.object({
-    fullName: yup.string().required('Consomateur requis'),
+    fullName: yup.string().required('Consommateur requis'),
   });
 
   const formik = useFormik({
@@ -35,14 +35,14 @@ function AddConsumer() {
   const [submit, { loading, error, data }] = useMutation(addConsumer, {
     onCompleted: (res) => {
       console.log('==>onCompleted', res);
-      enqueueSnackbar('Consomateur ajouté', { variant: 'success' });
+      enqueueSnackbar('Consommateur ajouté', { variant: 'success' });
       refetch();
       formik.resetForm();
     },
     onError: (err) => {
       console.log('==>error', err);
       if (err.message.includes('DUPLICATION')) {
-        enqueueSnackbar('Consomateur existe', { variant: 'warning' });
+        enqueueSnackbar('Consommateur existe', { variant: 'warning' });
       } else {
         enqueueSnackbar('Une erreur est survenue', { variant: 'error' });
       }
@@ -61,7 +61,7 @@ function AddConsumer() {
     <div className="login-form-container">
       <form onSubmit={formik.handleSubmit} className="login-form">
         <Typography variant="h4" sx={{ textAlign: 'start' }}>
-          Ajouter un consomateur
+          Ajouter un consommateur
         </Typography>
         <TextField
           fullWidth

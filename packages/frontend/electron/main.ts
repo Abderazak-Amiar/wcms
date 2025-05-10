@@ -92,20 +92,25 @@ ipcMain.on('invoice-ready', (_event, invoiceId) => {
   );
 });
 
-/** ✅ Save PDF invoices */
-ipcMain.handle('save-pdfs', async (_event, zipBuffer: Buffer) => {
-  const { filePath } = await dialog.showSaveDialog({
-    title: 'Save Invoices',
-    defaultPath: path.join(app.getPath('documents'), 'invoices.zip'),
-    filters: [{ name: 'ZIP Files', extensions: ['zip'] }],
-  });
+ipcMain.handle(
+  'save-pdfs',
+  async (_event, zipBuffer: Buffer, fileName: string) => {
+    const { filePath } = await dialog.showSaveDialog({
+      title: 'Save Invoices',
+      defaultPath: path.join(
+        app.getPath('documents'),
+        fileName || 'invoices.zip',
+      ),
+      filters: [{ name: 'ZIP Files', extensions: ['zip'] }],
+    });
 
-  if (filePath) {
-    fs.writeFileSync(filePath, zipBuffer);
-    return true;
-  }
-  return false;
-});
+    if (filePath) {
+      fs.writeFileSync(filePath, zipBuffer);
+      return true;
+    }
+    return false;
+  },
+);
 
 /** ✅ Lifecycle Hooks */
 
