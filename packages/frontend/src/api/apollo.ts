@@ -1,4 +1,6 @@
 import { ApolloClient, gql, InMemoryCache } from '@apollo/client';
+// uri: 'https://taourirt.abderazakamiar.com/graphql',
+// uri: 'http://localhost:4000/graphql',
 export const client = new ApolloClient({
   uri: 'http://localhost:4000/graphql',
   cache: new InMemoryCache(),
@@ -9,6 +11,17 @@ export const getUser = gql`
     userLogin(userName: $userName, password: $password) {
       userID
       userName
+      role
+    }
+  }
+`;
+
+export const getUserByID = gql`
+  query GetUserByID($userID: ID!) {
+    getUserByID(userID: $userID) {
+      userID
+      userName
+      role
     }
   }
 `;
@@ -116,6 +129,25 @@ export const addRecord = gql`
     }
   }
 `;
+export const updateRecord = gql`
+  mutation (
+    $recordID: ID!
+    $consumerID: ID!
+    $counterID: ID!
+    $newRecord: String!
+    $period: String!
+  ) {
+    updateRecord(
+      recordID: $recordID
+      consumerID: $consumerID
+      counterID: $counterID
+      newRecord: $newRecord
+      period: $period
+    ) {
+      recordID
+    }
+  }
+`;
 export const GET_RECORD = gql`
   query GetRecord($recordID: ID!) {
     record(recordID: $recordID) {
@@ -211,6 +243,7 @@ export const GET_INVOICES = gql`
         fullName
       }
       record {
+        recordID
         period
         recordDate
         nextRecordDate
@@ -239,6 +272,7 @@ export const GET_INVOICE = gql`
       isPaid
       isPrinted
       paymentCode
+      recordID
       consumer {
         consumerID
         fullName
@@ -294,6 +328,27 @@ export const UPDATE_INVOICE = gql`
       paymentDate
       isPaid
       isPrinted
+      updatedAt
+    }
+  }
+`;
+
+export const updateUser = gql`
+  mutation UpdateUser(
+    $userID: ID!
+    $userName: String!
+    $password: String!
+    $role: String!
+  ) {
+    updateUser(
+      userID: $userID
+      userName: $userName
+      password: $password
+      role: $role
+    ) {
+      userID
+      userName
+      role
       updatedAt
     }
   }

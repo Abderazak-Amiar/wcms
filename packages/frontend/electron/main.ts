@@ -1,4 +1,3 @@
-import { ChildProcess, spawn } from 'child_process';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -15,88 +14,12 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   : RENDERER_DIST;
 
 let win: BrowserWindow | null;
-let apiProcess: ChildProcess | null = null;
 const pendingInvoices = new Set<string>();
 
-// function startAPI(): void {
-//   const appRoot = process.env.APP_ROOT ?? __dirname; // Ensure APP_ROOT is always defined
-//   const apiPath = path.join(appRoot, 'packages/api/index.js');
-
-//   console.log('Starting API from path:', apiPath);
-
-//   apiProcess = spawn('node', [apiPath], {
-//     stdio: ['pipe', 'pipe', 'pipe'], // capture stdout, stderr, stdin
-//     shell: true,
-//   });
-
-//   // Ensure apiProcess is not null before trying to access stdout
-//   if (apiProcess) {
-//     // Handle stdout from the API process
-//     apiProcess.stdout?.on('data', (data) => {
-//       console.log('API stdout:', data.toString());
-//     });
-
-//     // Handle stderr from the API process
-//     apiProcess.stderr?.on('data', (data) => {
-//       console.error('API stderr:', data.toString());
-//     });
-//   }
-
-//   apiProcess.on('error', (err) => {
-//     console.error('❌ API startup error:', err);
-//   });
-
-//   apiProcess.on('exit', (code) => {
-//     console.log(`ℹ️ API process exited with code ${code}`);
-//     apiProcess = null;
-//   });
-// }
-function startAPI(): void {
-  // Set the appRoot to point to the current directory (frontend)
-  const appRoot = process.env.APP_ROOT ?? path.join(__dirname, '..'); // frontend root directory
-
-  // Correct path to the API index.js file inside 'packages/api'
-  const apiPath = path.join(appRoot, '..', 'api', 'index.js'); // going up one level to access packages/api
-
-  console.log('App Root:', appRoot);
-  console.log('Starting API from path:', apiPath);
-
-  apiProcess = spawn('node', [apiPath], {
-    stdio: ['pipe', 'pipe', 'pipe'], // capture stdout, stderr, stdin
-    shell: true,
-  });
-
-  if (apiProcess) {
-    apiProcess.stdout?.on('data', (data) => {
-      console.log('API stdout:', data.toString());
-    });
-
-    apiProcess.stderr?.on('data', (data) => {
-      console.error('API stderr:', data.toString());
-    });
-  }
-
-  apiProcess.on('error', (err) => {
-    console.error('❌ API startup error:', err);
-  });
-
-  apiProcess.on('exit', (code) => {
-    console.log(`ℹ️ API process exited with code ${code}`);
-    apiProcess = null;
-  });
-}
-
-/** ✅ Stop API Function */
-function stopAPI(): void {
-  if (apiProcess) {
-    apiProcess.kill();
-    apiProcess = null;
-  }
-}
-
-/** ✅ Create Electron Window */
 function createWindow(): void {
   win = new BrowserWindow({
+    show: false, // Hide initially to avoid flicker during resize
+    minimizable: true,
     icon: path.join(process.env.VITE_PUBLIC as string, 'electron-vite.svg'),
     webPreferences: {
       preload: path.join(app.getAppPath(), 'dist-electron', 'preload.mjs'),
@@ -104,7 +27,11 @@ function createWindow(): void {
       nodeIntegration: false,
       contextIsolation: true,
     },
-    transparent: true,
+  });
+
+  win.once('ready-to-show', () => {
+    win?.maximize(); // ✅ Fill screen but keep taskbar visible
+    win?.show();
   });
 
   win.webContents.on('did-finish-load', () => {
@@ -116,6 +43,10 @@ function createWindow(): void {
   } else {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'));
   }
+
+  win.on('closed', () => {
+    win = null;
+  });
 }
 
 /** ✅ Print Invoices */
@@ -180,7 +111,6 @@ ipcMain.handle('save-pdfs', async (_event, zipBuffer: Buffer) => {
 
 // Stop API when app is closed
 app.on('window-all-closed', () => {
-  stopAPI();
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -195,6 +125,5 @@ app.on('activate', () => {
 
 // ✅ Start API when Electron starts
 app.whenReady().then(() => {
-  startAPI();
   createWindow();
 });

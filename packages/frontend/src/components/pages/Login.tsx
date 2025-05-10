@@ -10,7 +10,7 @@ function Login() {
     (async () => {
       const auth = await isAuthenticated();
       if (auth) {
-        navigate('/home');
+        navigate('/welcome');
       }
     })();
   }, [navigate]);

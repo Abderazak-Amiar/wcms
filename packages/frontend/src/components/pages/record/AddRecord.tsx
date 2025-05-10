@@ -54,9 +54,16 @@ function AddRecord() {
       console.error('==> error', err);
       if (err.message.includes('DUPLICATION')) {
         enqueueSnackbar('Duplication détectée', { variant: 'warning' });
-      }
-      if (err.message.includes('INVALID_RECORD')) {
+      } else if (err.message.includes('INVALID_RECORD')) {
         enqueueSnackbar('Recensement incorrecte: valeur inférieur', {
+          variant: 'error',
+        });
+      } else if (
+        err.message.includes(
+          'INVOICE_EXISTS: An invoice already exists for this consumer and period',
+        )
+      ) {
+        enqueueSnackbar('Facture Existe Pour Cette Période', {
           variant: 'error',
         });
       } else {

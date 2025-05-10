@@ -1,6 +1,5 @@
-import { useApolloClient, useMutation, useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   Autocomplete,
@@ -22,7 +21,6 @@ import {
   TablePagination,
   TableRow,
   TextField,
-  Tooltip,
   Typography,
 } from '@mui/material';
 import { saveAs } from 'file-saver'; // Optional: for saving files in the browser
@@ -35,15 +33,12 @@ import {
   DELETE_INVOICE,
   GET_INVOICES,
   UPDATE_INVOICE_PRINTED,
-  getDebtsByConsumer,
   getSettings,
 } from '../../../api/apollo';
-import { getCurrentTrimesterFr } from '../../../helpers/getCurrentTrimester';
 import DeleteConfirmationDialog from '../../molecules/DeleteConfirmationDialog';
-import { EditInvoiceModal } from './EditInvoiceModal';
 import InvoiceDetailsModal from './InvoiceDetailsModal';
 
-export type Invoice = {
+type Invoice = {
   invoiceID: string;
   createdAt: string;
   amount: number;
@@ -54,7 +49,6 @@ export type Invoice = {
     fullName: string;
   };
   record: {
-    recordID: string;
     period: string;
     recordDate: string;
     nextRecordDate: string;
@@ -82,23 +76,10 @@ type Settings = {
     deadline: string;
   };
 };
-type Debt = {
-  invoiceID: string;
-  amount: string;
-  isPaid: boolean;
-  createdAt: string;
-};
+
 // Utility function to generate PDF for an invoice
-declare module 'jspdf' {
-  interface jsPDF {
-    lastAutoTable?: { finalY?: number };
-  }
-}
-const generateInvoicePDF = (
-  invoice: Invoice,
-  settings: Settings,
-  debts: Debt[],
-) => {
+
+const generateInvoicePDF = (invoice: Invoice, settings: Settings) => {
   const quantityConsumed =
     (invoice?.record?.newRecord ?? 0) - (invoice?.record?.oldRecord ?? 0);
   const doc = new jsPDF();
@@ -302,31 +283,20 @@ const generateInvoicePDF = (
     theme: 'grid',
     styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
   });
-  const visibleDebts = debts.filter((debt) => Number(debt.amount) > 0);
-
-  if (visibleDebts.length > 0) {
-    autoTable(doc, {
-      head: [['Dettes', 'Montant', 'Date']],
-      body: visibleDebts.map((debt) => [
-        debt.invoiceID?.substring(0, 8) || 'N/A',
-        `${debt.amount} DA`,
-        moment(debt.createdAt).format('DD MMM YYYY'),
-      ]),
-      startY: (doc.lastAutoTable?.finalY ?? 10) + 10,
-      theme: 'grid',
-      styles: {
-        lineColor: [200, 200, 200],
-        lineWidth: 0.5,
-      },
-      headStyles: {
-        fillColor: false,
-        textColor: [0, 0, 0],
-        fontStyle: 'bold',
-        halign: 'center',
-        fontSize: 12,
-      },
-    });
-  }
+  autoTable(doc, {
+    body: [
+      [
+        { content: 'Dette', styles: { fontStyle: 'bold' } },
+        { content: 'Date', styles: { fontStyle: 'bold' } },
+      ],
+      [
+        `${invoice?.debt?.amount ?? '0'} DA`,
+        `${moment(invoice?.debt?.createdAt).format('DD MMM YYYY')}`,
+      ],
+    ],
+    theme: 'grid',
+    styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
+  });
   // Terms & Notes
   autoTable(doc, {
     body: [
@@ -377,10 +347,6 @@ const generateInvoicePDF = (
 };
 
 const InvoiceList: React.FC = () => {
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
-  console.log('==>');
-  const client = useApolloClient();
   const [isPrintedFilter, setIsPrintedFilter] = useState<
     boolean | 'all' | string
   >('all');
@@ -402,16 +368,6 @@ const InvoiceList: React.FC = () => {
     start: '',
     end: '',
   });
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const handleCopy = async (id: string) => {
-    try {
-      await navigator.clipboard.writeText(id);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 5000);
-    } catch (err) {
-      console.error('Copy failed:', err);
-    }
-  };
   const [deleteInvoice] = useMutation(DELETE_INVOICE, {
     update(cache, { data }) {
       if (data?.deleteInvoice) {
@@ -491,6 +447,40 @@ const InvoiceList: React.FC = () => {
     }
   };
 
+  // const handlePrintInvoices = async () => {
+  //   if (selectedInvoices.length === 0) return;
+
+  //   const zip = new JSZip();
+
+  //   await Promise.all(
+  //     selectedInvoices.map(async (invoiceID) => {
+  //       const invoice = data?.invoices?.find(
+  //         (inv) => inv.invoiceID === invoiceID,
+  //       );
+  //       if (!invoice) return;
+  //       if (!dataSettings) return;
+  //       const doc = generateInvoicePDF(invoice, dataSettings);
+  //       const pdfBlob = doc.output('blob');
+  //       zip.file(`Facture_${invoice.invoiceID}.pdf`, pdfBlob);
+  //       await updateInvoicePrinted({ variables: { invoiceID } });
+  //     }),
+  //   );
+
+  //   const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+  //   // Save the ZIP file using Electron's file save dialog
+  //   if (window.electron) {
+  //     window.electron.savePDFs(zipBlob);
+  //   } else {
+  //     // Fallback for browser environment
+  //     saveAs(zipBlob, 'invoices.zip');
+  //   }
+
+  //   setSelectedInvoices([]);
+  //   refetch();
+  // };
+
+  // Filter invoices based on filter criteria
   const handlePrintInvoices = async () => {
     if (selectedInvoices.length === 0) return;
 
@@ -548,20 +538,9 @@ const InvoiceList: React.FC = () => {
     await Promise.all(
       filteredInvoices.map(async (invoice) => {
         if (!dataSettings) return;
-
-        // ✅ Fetch debts of the consumer
-        const { data: consumerDebtData } = await client.query({
-          query: getDebtsByConsumer,
-          variables: { consumerID: invoice.consumer.consumerID },
-          fetchPolicy: 'network-only',
-        });
-
-        const debts = consumerDebtData?.getDebtsByConsumer || [];
-
-        const doc = generateInvoicePDF(invoice, dataSettings, debts);
+        const doc = generateInvoicePDF(invoice, dataSettings);
         const pdfBlob = doc.output('blob');
         zip.file(`Facture_${invoice.invoiceID}.pdf`, pdfBlob);
-
         await updateInvoicePrinted({
           variables: { invoiceID: invoice.invoiceID },
         });
@@ -569,14 +548,13 @@ const InvoiceList: React.FC = () => {
     );
 
     const zipBlob = await zip.generateAsync({ type: 'blob' });
-    const currentPeriod = getCurrentTrimesterFr();
-    const currentYear = new Date().getFullYear();
+
     // Save the ZIP file using Electron's file save dialog
     if (window.electron) {
       // @ts-expect-error Property 'savePDFs' does not exist on type 'window.electron'
       window.electron.savePDFs(zipBlob);
     } else {
-      saveAs(zipBlob, `${currentPeriod}_${currentYear}`);
+      saveAs(zipBlob, 'invoices.zip');
     }
 
     setSelectedInvoices([]);
@@ -584,24 +562,16 @@ const InvoiceList: React.FC = () => {
   };
 
   console.log('==>dataa', data);
-  const filteredInvoices = data?.invoices?.filter((invoice) => {
-    const isPaid = invoice?.isPaid === true;
-    const debt = invoice?.debt;
-    const isDebtPaid = debt?.isPaid === true;
-    const hasDebt = debt !== null;
-
+  const filteredInvoices = data?.invoices?.filter((invoice, index) => {
+    console.log('==>invoice?.debt?.isPaid', invoice?.debt?.isPaid, index);
     // Filter by status
-    if (statusFilter === 'P') {
-      if (!(isPaid && (!hasDebt || isDebtPaid))) return false;
-    }
 
-    if (statusFilter === 'PP') {
-      if (!(isPaid && hasDebt && !isDebtPaid)) return false;
-    }
+    if (statusFilter === 'P' && !(invoice.isPaid && invoice?.debt?.isPaid))
+      return false;
+    if (statusFilter === 'PP' && !(invoice.isPaid && !invoice?.debt?.isPaid))
+      return false;
 
-    if (statusFilter === 'NP') {
-      if (isPaid) return false;
-    }
+    if (statusFilter === 'NP' && invoice.isPaid) return false;
 
     // Filter by consumer name
     if (
@@ -627,8 +597,6 @@ const InvoiceList: React.FC = () => {
     if (periodFilter !== 'all' && invoice.record.period !== periodFilter) {
       return false;
     }
-
-    // Filter by print status
     if (isPrintedFilter !== 'all' && invoice.isPrinted !== isPrintedFilter) {
       return false;
     }
@@ -749,6 +717,7 @@ const InvoiceList: React.FC = () => {
           {/* isPrinted Filter */}
           <Grid item xs={12} sm={3}>
             <FormControl fullWidth variant="outlined" size="small">
+  
               <Autocomplete
                 value={
                   options.find((option) => option.value === isPrintedFilter) ||
@@ -808,28 +777,7 @@ const InvoiceList: React.FC = () => {
                         onChange={() => handleSelect(item.invoiceID)}
                       />
                     </TableCell>
-                    <Tooltip
-                      title={
-                        copiedId === item.invoiceID
-                          ? 'Copié'
-                          : 'Cliquer pour copier'
-                      }
-                      arrow
-                    >
-                      <TableCell
-                        onClick={() => handleCopy(item?.invoiceID)}
-                        sx={{
-                          fontFamily: 'monospace',
-                          cursor: 'pointer',
-                          userSelect: 'none',
-                          '&:hover': {
-                            fontWeight: 'bold',
-                          },
-                        }}
-                      >
-                        {item?.invoiceID.substring(0, 8)}
-                      </TableCell>
-                    </Tooltip>
+                    <TableCell>{item?.invoiceID.substring(0, 8)}</TableCell>
                     <TableCell>{item?.consumer?.fullName}</TableCell>
                     <TableCell>{item?.amount}</TableCell>
                     <TableCell>{item?.record?.period}</TableCell>
@@ -853,15 +801,6 @@ const InvoiceList: React.FC = () => {
                         onClick={() => handleDeleteConfirm(item.invoiceID)}
                       >
                         <DeleteIcon />
-                      </IconButton>
-                      <IconButton
-                        aria-label="Modifier"
-                        onClick={() => {
-                          setEditingInvoice(item);
-                          setEditModalOpen(true);
-                        }}
-                      >
-                        <EditIcon />
                       </IconButton>
                     </TableCell>
                   </TableRow>
@@ -914,14 +853,6 @@ const InvoiceList: React.FC = () => {
         onConfirm={handleDelete}
         message="Êtes-vous sûr de vouloir supprimer cette facture ? Cette action est
           irréversible."
-      />
-      <EditInvoiceModal
-        invoice={editingInvoice}
-        open={editModalOpen}
-        onClose={() => {
-          setEditModalOpen(false);
-          setEditingInvoice(null);
-        }}
       />
     </Box>
   );

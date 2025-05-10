@@ -1,5 +1,7 @@
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import CountertopsIcon from '@mui/icons-material/Countertops';
 import GasMeterIcon from '@mui/icons-material/GasMeter';
+import LogoutIcon from '@mui/icons-material/Logout';
 import PaidIcon from '@mui/icons-material/Paid';
 import PeopleIcon from '@mui/icons-material/People';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
@@ -24,7 +26,9 @@ function Layout() {
     <ReceiptIcon />,
     <PaidIcon />,
     <PointOfSaleIcon />,
+    <AssessmentIcon />,
     <SettingsIcon />,
+    <LogoutIcon />,
   ];
   const menuFr = [
     'Recensement',
@@ -33,6 +37,7 @@ function Layout() {
     'Facture',
     'Paiement',
     'Dette',
+    'Rapports',
     'Paramètres',
   ];
   const menu = [
@@ -42,6 +47,7 @@ function Layout() {
     'invoice',
     'payment',
     'debt',
+    'reports',
     'settings',
   ];
 
@@ -68,6 +74,14 @@ function Layout() {
               </ListItemButton>
             </ListItem>
           ))}
+          <ListItem key="5454" disablePadding>
+            <ListItemButton component={Link} to="/logout">
+              <ListItemIcon>
+                <LogoutIcon />
+              </ListItemIcon>
+              <ListItemText primary="Déconnexion" />
+            </ListItemButton>
+          </ListItem>
         </List>
       </Paper>
 

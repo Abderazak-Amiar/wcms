@@ -1,9 +1,10 @@
 import { useMutation, useQuery } from '@apollo/client';
-import { Button, TextField, Typography } from '@mui/material';
+import { Box, Button, TextField, Typography } from '@mui/material';
 import { useFormik } from 'formik';
 import { enqueueSnackbar } from 'notistack';
 import * as yup from 'yup';
 import { addSettings, getSettings } from '../../api/apollo';
+import UserForm from '../molecules/UserForm';
 
 // Define Settings Type
 type SettingsFormValues = {
@@ -67,7 +68,8 @@ function AddSettings() {
 
   return (
     <div className="login-form-container">
-      <form onSubmit={formik.handleSubmit} className="login-form">
+      <Box sx={{display: 'flex', flexDirection: 'row', gap: '16px'}}>
+      <div>     <form onSubmit={formik.handleSubmit} className="login-form">
         <Typography variant="h4" sx={{ textAlign: 'start' }}>
           Paramètres
         </Typography>
@@ -177,7 +179,10 @@ function AddSettings() {
         >
           {loading ? 'Chargement...' : 'Enregistrer'}
         </Button>
-      </form>
+      </form></div>
+ 
+      <UserForm/>
+      </Box>
     </div>
   );
 }

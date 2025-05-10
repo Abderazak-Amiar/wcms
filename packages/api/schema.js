@@ -124,12 +124,14 @@ type Query {
     getDebt(invoiceID: ID!): Debt
     getDebtsByConsumer(consumerID: ID!): [Debt]
     getDebts(consumerID: ID!): [Debt]
+    getUserByID(userID: ID!): User
 }
 
 type Mutation {
     addConsumer(fullName: String!): Consumer!
     addPayment(consumerID: ID!, invoiceID:String!, paidAmount:Float!): Payment!
     addRecord(newRecord: String!, counterID: ID!, consumerID: ID!, period:String!): Record!
+    updateRecord(recordID:ID!, newRecord: String!, counterID: ID!, consumerID: ID!, period:String!): Record!
     addCounter(counterID: ID!, consumerID: ID!, price: String!): Counter!
     updateConsumer(consumerID: ID!, fullName: String!): Consumer
     updateCounter(counterID: ID!, status: String!, price: String!, consumerID:ID!): ResponseMessage
@@ -160,6 +162,7 @@ type Mutation {
   ): Invoice
 
   deleteInvoice(invoiceID: ID!): Invoice
+  updateUser(userID: ID!, userName: String, password: String, role: String): User
 }
 
 `;
@@ -356,6 +359,14 @@ export const resolvers = {
         );
       });
     },
+    getUserByID: (_, { userID }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+        db.get(`SELECT * FROM user WHERE userID = ?`, [userID], (err, row) => {
+          if (err) reject(err);
+          resolve(row);
+        });
+      }),
   },
 
   Mutation: {
@@ -768,135 +779,223 @@ export const resolvers = {
 
     addRecord: (_, { newRecord, counterID, consumerID, period, userID = 1 }) =>
       new Promise((resolve, reject) => {
-        console.log('==> counterID', counterID);
         if (!db.open) return reject(new Error('Database is closed'));
 
-        // Get the last record for the given consumerID
+        // Step 1: Check if an invoice already exists for this consumer and period
         db.get(
-          `SELECT * FROM record WHERE consumerID = ? ORDER BY recordDate DESC LIMIT 1`,
-          [consumerID],
-          (err, lastRecord) => {
+          `SELECT i.invoiceID 
+           FROM invoice i
+           JOIN record r ON i.recordID = r.recordID
+           WHERE r.consumerID = ? AND r.period = ?`,
+          [consumerID, period],
+          (err, existingInvoice) => {
             if (err) return reject(err);
 
-            let isUpdating = false;
-            let oldRecord = 0;
-
-            if (lastRecord) {
-              oldRecord = lastRecord.newRecord;
-
-              // Prevent adding a new record if it's lower than the last recorded value
-              if (newRecord <= oldRecord) {
-                return reject(
-                  new Error(
-                    `INVALID_RECORD: New record (${newRecord}) must be greater than the last recorded value (${oldRecord}).`,
-                  ),
-                );
-              }
-
-              // If the period is the same, update the record
-              if (lastRecord.period === period) {
-                isUpdating = true;
-              }
+            if (existingInvoice) {
+              return reject(
+                new Error(
+                  `INVOICE_EXISTS: An invoice already exists for this consumer and period.`,
+                ),
+              );
             }
 
-            // Prepare new record data
-            const recordID = isUpdating ? lastRecord.recordID : nanoid();
-            const createdAt = isUpdating
-              ? lastRecord.createdAt
-              : new Date().toISOString();
-            const updatedAt = new Date().toISOString();
-            const recordDate = moment().toISOString();
-            const nextRecordDate = moment(recordDate)
-              .add(3, 'months')
-              .toISOString();
+            // Step 2: Get the last record for this consumer
+            db.get(
+              `SELECT * FROM record WHERE consumerID = ? ORDER BY recordDate DESC LIMIT 1`,
+              [consumerID],
+              (err, lastRecord) => {
+                if (err) return reject(err);
 
-            const newRecordObj = {
-              recordID,
-              period,
-              recordDate,
-              nextRecordDate,
-              oldRecord,
-              newRecord,
-              createdAt,
-              updatedAt,
-              counterID,
-              consumerID,
-              userID,
-            };
+                let oldRecord = 0;
 
-            console.log('==> newRecordObj', newRecordObj);
+                // Ensure oldRecord is the newRecord of the last inserted record
+                if (lastRecord) {
+                  oldRecord = lastRecord.newRecord;
+                }
 
-            const query = isUpdating
-              ? `UPDATE record 
-                   SET recordDate = ?, nextRecordDate = ?, oldRecord = ?, 
-                       newRecord = ?, updatedAt = ?, counterID = ?, consumerID = ?, userID = ? 
-                   WHERE recordID = ?`
-              : `INSERT INTO record 
-                   (recordID, period, recordDate, nextRecordDate, oldRecord, newRecord, createdAt, updatedAt, counterID, consumerID, userID) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                const newRecordNumber = parseFloat(newRecord);
+                const oldRecordNumber = parseFloat(oldRecord);
 
-            const params = isUpdating
-              ? [
-                  newRecordObj.recordDate,
-                  newRecordObj.nextRecordDate,
-                  newRecordObj.oldRecord,
-                  newRecordObj.newRecord,
-                  newRecordObj.updatedAt,
-                  newRecordObj.counterID,
-                  newRecordObj.consumerID,
-                  newRecordObj.userID,
-                  newRecordObj.recordID,
-                ]
-              : Object.values(newRecordObj);
+                if (newRecordNumber <= oldRecordNumber) {
+                  return reject(
+                    new Error(
+                      `INVALID_RECORD: New record (${newRecord}) must be greater than the last recorded value (${oldRecord}).`,
+                    ),
+                  );
+                }
 
-            db.run(query, params, function (err) {
-              if (err) return reject(err);
+                // Step 3: Always create a new record
+                const recordID = nanoid();
+                const createdAt = new Date().toISOString();
+                const updatedAt = new Date().toISOString();
+                const recordDate = moment().toISOString();
+                const nextRecordDate = moment(recordDate)
+                  .add(3, 'months')
+                  .toISOString();
 
-              // Fetch settings after successfully inserting/updating the record
-              db.get(
-                `SELECT m3price FROM settings LIMIT 1`,
-                [],
-                (err, settingsRow) => {
+                const newRecordObj = {
+                  recordID,
+                  period,
+                  recordDate,
+                  nextRecordDate,
+                  oldRecord,
+                  newRecord,
+                  createdAt,
+                  updatedAt,
+                  counterID,
+                  consumerID,
+                  userID,
+                };
+
+                const query = `INSERT INTO record 
+                               (recordID, period, recordDate, nextRecordDate, oldRecord, newRecord, createdAt, updatedAt, counterID, consumerID, userID) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+                const params = Object.values(newRecordObj);
+
+                db.run(query, params, function (err) {
                   if (err) return reject(err);
-                  if (!settingsRow)
-                    return reject(new Error('Settings not found'));
 
-                  const consumption =
-                    newRecordObj.newRecord - newRecordObj.oldRecord;
-                  const totalAmount =
-                    consumption * parseFloat(settingsRow.m3price);
-                  const invoiceID = nanoid();
-                  const debtID = null;
-                  const paymentCode = `INV-${invoiceID.slice(0, 8)}`;
-
-                  db.run(
-                    `INSERT INTO invoice 
-                   (invoiceID, amount, paymentCode, paymentDate, isPaid, isPrinted, createdAt, updatedAt, consumerID, debtID, recordID, userID) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [
-                      invoiceID,
-                      totalAmount.toFixed(2),
-                      paymentCode,
-                      null, // Payment date is initially null
-                      false, // Not paid initially
-                      false, // Not printed initially
-                      new Date().toISOString(),
-                      updatedAt,
-                      consumerID,
-                      debtID,
-                      newRecordObj.recordID,
-                      userID,
-                    ],
-                    function (err) {
+                  // Step 4: Fetch price settings
+                  db.get(
+                    `SELECT m3price FROM settings LIMIT 1`,
+                    [],
+                    (err, settingsRow) => {
                       if (err) return reject(err);
-                      return resolve(newRecordObj);
+                      if (!settingsRow)
+                        return reject(new Error('Settings not found'));
+
+                      const consumption =
+                        newRecordObj.newRecord - newRecordObj.oldRecord;
+                      const totalAmount =
+                        consumption * parseFloat(settingsRow.m3price);
+                      const invoiceID = nanoid();
+                      const paymentCode = `INV-${invoiceID.slice(0, 8)}`;
+
+                      db.run(
+                        `INSERT INTO invoice 
+                       (invoiceID, amount, paymentCode, paymentDate, isPaid, isPrinted, createdAt, updatedAt, consumerID, debtID, recordID, userID) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [
+                          invoiceID,
+                          totalAmount.toFixed(2),
+                          paymentCode,
+                          null,
+                          false,
+                          false,
+                          new Date().toISOString(),
+                          updatedAt,
+                          consumerID,
+                          null, // debtID
+                          newRecordObj.recordID,
+                          userID,
+                        ],
+                        function (err) {
+                          if (err) return reject(err);
+                          return resolve(newRecordObj);
+                        },
+                      );
                     },
                   );
-                },
-              );
-            });
+                });
+              },
+            );
           },
         );
+      }),
+
+    updateRecord: (
+      _,
+      { recordID, newRecord, counterID, consumerID, period, userID = 1 },
+    ) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+
+        const now = new Date().toISOString();
+        const newReading = parseFloat(newRecord);
+
+        const getRecordByID = () =>
+          new Promise((res, rej) => {
+            db.get(
+              `SELECT * FROM record WHERE recordID = ?`,
+              [recordID],
+              (err, row) => (err ? rej(err) : res(row)),
+            );
+          });
+
+        const getSettings = () =>
+          new Promise((res, rej) => {
+            db.get(`SELECT m3price FROM settings LIMIT 1`, [], (err, row) =>
+              err ? rej(err) : res(row),
+            );
+          });
+
+        const updateRecordInDB = () =>
+          new Promise((res, rej) => {
+            db.run(
+              `UPDATE record SET 
+                  newRecord = ?, updatedAt = ?, userID = ?, counterID = ?, consumerID = ?, period = ?
+                 WHERE recordID = ?`,
+              [
+                newReading,
+                now,
+                userID,
+                counterID,
+                consumerID,
+                period,
+                recordID,
+              ],
+              (err) => (err ? rej(err) : res()),
+            );
+          });
+
+        const updateInvoice = (record, totalAmount) =>
+          new Promise((res, rej) => {
+            db.run(
+              `UPDATE invoice SET 
+                  amount = ?, updatedAt = ?, consumerID = ?, userID = ?
+                 WHERE recordID = ?`,
+              [totalAmount.toFixed(2), now, consumerID, userID, recordID],
+              (err) => (err ? rej(err) : res()),
+            );
+          });
+
+        getRecordByID()
+          .then((record) => {
+            if (!record) {
+              throw new Error(`Record with ID ${recordID} not found.`);
+            }
+
+            if (newReading <= record.oldRecord) {
+              throw new Error(
+                `INVALID_RECORD: New record (${newReading}) must be greater than the previous value (${record.oldRecord}).`,
+              );
+            }
+
+            return updateRecordInDB().then(() =>
+              getSettings().then((settings) => {
+                if (!settings) throw new Error('Settings not found.');
+
+                const consumption = newReading - record.oldRecord;
+                const totalAmount = consumption * parseFloat(settings.m3price);
+
+                const updatedRecord = {
+                  ...record,
+                  newRecord: newReading,
+                  counterID,
+                  consumerID,
+                  period,
+                  updatedAt: now,
+                  userID,
+                };
+
+                return updateInvoice(updatedRecord, totalAmount).then(() =>
+                  resolve(updatedRecord),
+                );
+              }),
+            );
+          })
+          .catch((err) => reject(err));
       }),
 
     updateInvoice: async (
@@ -1121,6 +1220,35 @@ export const resolvers = {
         throw new Error('Failed to update invoice');
       }
     },
+    updateUser: (_, { userID, userName, password, role }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+
+        const updatedAt = new Date().toISOString();
+
+        db.run(
+          `UPDATE user SET 
+            userName = COALESCE(?, userName), 
+            password = COALESCE(?, password), 
+            role = COALESCE(?, role), 
+            updatedAt = ? 
+          WHERE userID = ?`,
+          [userName, password, role, updatedAt, userID],
+          function (err) {
+            if (err) return reject(err);
+            if (this.changes === 0) return reject(new Error('User not found'));
+
+            db.get(
+              `SELECT * FROM user WHERE userID = ?`,
+              [userID],
+              (err, row) => {
+                if (err) return reject(err);
+                resolve(row);
+              },
+            );
+          },
+        );
+      }),
   },
   Counter: {
     consumer: (parent) => {

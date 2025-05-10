@@ -1,5 +1,6 @@
 import CountertopsIcon from '@mui/icons-material/Countertops';
 import GasMeterIcon from '@mui/icons-material/GasMeter';
+import LogoutIcon from '@mui/icons-material/Logout';
 import PaidIcon from '@mui/icons-material/Paid';
 import PeopleIcon from '@mui/icons-material/People';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
@@ -25,6 +26,7 @@ function Home() {
     <PaidIcon />,
     <PointOfSaleIcon />,
     <SettingsIcon />,
+    <LogoutIcon />,
   ];
   const menuFr = [
     'Recensement',
@@ -34,6 +36,7 @@ function Home() {
     'Paiement',
     'Dette',
     'Paramètres',
+    'Déconnexion',
   ];
   const menu = [
     'record',
@@ -43,6 +46,7 @@ function Home() {
     'payment',
     'debt',
     'settings',
+    'logout',
   ];
   const theme = useTheme();
   return (
@@ -80,9 +84,7 @@ function Home() {
           ))}
         </Paper>
       </Grid>
-      <Grid
-        size={10}
-      >
+      <Grid size={10}>
         <Outlet />
       </Grid>
     </Grid>

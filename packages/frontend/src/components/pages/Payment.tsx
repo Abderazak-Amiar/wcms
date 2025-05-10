@@ -48,8 +48,10 @@ function AddRecord() {
         enqueueSnackbar('Facture Non Trouvée', {
           variant: 'error',
         });
-      } else if (err.message.includes('Invoice does not belong to this consumer')) {
-        enqueueSnackbar('Facture n\'appartient pas à ce consommateur', {
+      } else if (
+        err.message.includes('Invoice does not belong to this consumer')
+      ) {
+        enqueueSnackbar("Facture n'appartient pas à ce consommateur", {
           variant: 'error',
         });
       } else {
@@ -96,14 +98,19 @@ function AddRecord() {
   });
 
   const submitPayment = useCallback(
-    (values: PymentFormValues) => {
-      submit({
-        variables: {
-          ...values,
-        },
-      });
+    async (values: PymentFormValues) => {
+      try {
+        await submit({
+          variables: {
+            ...values,
+          },
+        });
+        formik.resetForm(); // reset after successful submit
+      } catch (error) {
+        console.error('Payment submission error:', error);
+      }
     },
-    [submit],
+    [submit, formik],
   );
 
   return (

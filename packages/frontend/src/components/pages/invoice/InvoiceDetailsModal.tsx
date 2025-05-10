@@ -58,15 +58,17 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
         ) : invoice ? (
           <>
             <InvoiceComponent invoice={invoice} settings={settings} />
-            <Box sx={{ mt: 1, textAlign: 'center' }} className="no-print">
-              <Button
+            <Box
+              sx={{ mt: 1, textAlign: 'center', '@media print': { display: 'none' } }}
+            >
+                <Button
                 variant="contained"
                 color="primary"
                 onClick={handlePrint}
                 sx={{ px: 4, py: 1 }}
-              >
+                >
                 Imprimer la Facture
-              </Button>
+                </Button>
             </Box>
           </>
         ) : (
