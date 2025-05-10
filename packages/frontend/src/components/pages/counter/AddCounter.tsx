@@ -27,7 +27,7 @@ function AddCounter() {
   const validationSchema = yup.object({
     counterID: yup.string().required('Numéro compteur requis'),
     price: yup.string().required('Prix requis'),
-    consumerID: yup.string().required('Consomateur requis'),
+    consumerID: yup.string().required('Consommateur requis'),
   });
 
   // Formik setup with types
@@ -39,7 +39,6 @@ function AddCounter() {
       submit({ variables: values });
     },
   });
-
 
   const [submit, { loading }] = useMutation(addCounter, {
     onCompleted: (res) => {
