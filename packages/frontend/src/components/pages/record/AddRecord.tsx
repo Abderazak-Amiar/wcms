@@ -4,54 +4,66 @@ import { useFormik } from 'formik';
 import { enqueueSnackbar } from 'notistack';
 import { useCallback, useEffect } from 'react';
 import * as yup from 'yup';
-import { addPayment, getConsumers } from '../../api/apollo';
+import { addRecord, getConsumers } from '../../../api/apollo';
+import { getCurrentTrimester } from '../../../helpers/getCurrentTrimester';
+import { TrimesterSelector } from '../../molecules/TrimesterSelector';
 
 // Définition des types
+type Counter = {
+  counterID: string;
+  status: string;
+};
 
 type Consumer = {
   consumerID: string;
   fullName: string;
+  counters: Counter[];
 };
 
-type PymentFormValues = {
+type AddRecordFormValues = {
   consumerID: string;
-  invoiceID: string;
-  paidAmount: string;
+  counterID: string;
+  newRecord: string;
+  period: string;
 };
 
 function AddRecord() {
-  const initialValues: PymentFormValues = {
+  const initialValues: AddRecordFormValues = {
     consumerID: '',
-    invoiceID: '',
-    paidAmount: '',
+    counterID: '',
+    newRecord: '',
+    period: getCurrentTrimester(),
   };
 
   const validationSchema = yup.object({
-    paidAmount: yup
+    newRecord: yup
       .string()
       .matches(/^\d+$/, 'Veuillez entrer un nombre valide') // ✅ Accepte uniquement les chiffres
-      .required('Montant requis'),
+      .required('Recensement requis'),
     consumerID: yup.string().required('Consommateur requis'),
-    invoiceID: yup.string().required('N° de facture requis'),
+    counterID: yup.string().required('CounterID requis'),
+    period: yup.string().required('Periode requise'),
   });
 
   // Mutation pour ajouter un enregistrement
-  const [submit, { loading }] = useMutation(addPayment, {
+  const [submit, { loading }] = useMutation(addRecord, {
     onCompleted: () => {
-      enqueueSnackbar('Paiement fait avec succès', { variant: 'success' });
+      enqueueSnackbar('Recensement fait avec succès', { variant: 'success' });
     },
     onError: (err) => {
       console.error('==> error', err);
-      if (err.message.includes('Total paid amount exceeds invoice amount')) {
-        enqueueSnackbar('Montant supérieur !', { variant: 'info' });
-      } else if (err.message.includes('Invoice not found')) {
-        enqueueSnackbar('Facture Non Trouvée', {
+      if (err.message.includes('DUPLICATION')) {
+        enqueueSnackbar('Duplication détectée', { variant: 'warning' });
+      } else if (err.message.includes('INVALID_RECORD')) {
+        enqueueSnackbar('Recensement incorrecte: valeur inférieur', {
           variant: 'error',
         });
       } else if (
-        err.message.includes('Invoice does not belong to this consumer')
+        err.message.includes(
+          'INVOICE_EXISTS: An invoice already exists for this consumer and period',
+        )
       ) {
-        enqueueSnackbar("Facture n'appartient pas à ce consommateur", {
+        enqueueSnackbar('Facture Existe Pour Cette Période', {
           variant: 'error',
         });
       } else {
@@ -65,7 +77,6 @@ function AddRecord() {
     loading: queryLoading,
     error: queryError,
     data: consumersData,
-    refetch,
   } = useQuery<{ consumers: Consumer[] }>(getConsumers);
 
   // Affichage d'une notification en cas d'erreur de requête
@@ -78,46 +89,35 @@ function AddRecord() {
     }
   }, [queryError]);
 
-  const stableRefetch = useCallback(() => {
-    refetch();
-  }, [refetch]);
-
-  useEffect(() => {
-    stableRefetch();
-  }, [stableRefetch]); // ✅ No ESLint warning
   const consumers = consumersData?.consumers ?? [];
 
   // Formik pour gérer le formulaire
-  const formik = useFormik<PymentFormValues>({
+  const formik = useFormik<AddRecordFormValues>({
     initialValues,
     validationSchema,
     onSubmit: (values) => {
       console.log('==>values', values);
-      submitPayment(values);
+      submitRecord(values);
     },
   });
 
-  const submitPayment = useCallback(
-    async (values: PymentFormValues) => {
-      try {
-        await submit({
-          variables: {
-            ...values,
-          },
-        });
-        formik.resetForm(); // reset after successful submit
-      } catch (error) {
-        console.error('Payment submission error:', error);
-      }
+  const submitRecord = useCallback(
+    (values: AddRecordFormValues) => {
+      submit({
+        variables: {
+          ...values,
+          newRecord: String(values.newRecord), // ✅ Conversion en string
+        },
+      });
     },
-    [submit, formik],
+    [submit],
   );
 
   return (
     <div className="login-form-container">
       <form onSubmit={formik.handleSubmit} className="login-form">
         <Typography variant="h4" sx={{ textAlign: 'start' }}>
-          Paiement Facture
+          Recensement
         </Typography>
 
         <Autocomplete
@@ -136,6 +136,12 @@ function AddRecord() {
               'consumerID',
               newValue ? newValue.consumerID : '',
             );
+            formik.setFieldValue(
+              'counterID',
+              newValue?.counters?.find(
+                (counter) => counter.status === 'En Marche',
+              )?.counterID ?? '',
+            );
           }}
           renderInput={(params) => (
             <TextField
@@ -148,33 +154,24 @@ function AddRecord() {
             />
           )}
         />
-
-        <TextField
-          fullWidth
-          type="text"
-          id="invoiceID"
-          name="invoiceID"
-          label="N° Facture"
-          value={formik.values.invoiceID}
-          onChange={formik.handleChange}
-          onBlur={formik.handleBlur}
-          error={formik.touched.paidAmount && Boolean(formik.errors.invoiceID)}
-          helperText={formik.touched.invoiceID && formik.errors.invoiceID}
-          sx={{ marginBlock: '8px' }}
+        <TrimesterSelector
+          value={formik.values.period}
+          onChange={(value) => formik.setFieldValue('period', value)}
         />
         <TextField
           fullWidth
           type="number"
-          id="paidAmount"
-          name="paidAmount"
-          label="Montant"
-          value={formik.values.paidAmount}
+          id="newRecord"
+          name="newRecord"
+          label="Consommation d'eau en M³"
+          value={formik.values.newRecord}
           onChange={formik.handleChange}
           onBlur={formik.handleBlur}
-          error={formik.touched.paidAmount && Boolean(formik.errors.paidAmount)}
-          helperText={formik.touched.paidAmount && formik.errors.paidAmount}
+          error={formik.touched.newRecord && Boolean(formik.errors.newRecord)}
+          helperText={formik.touched.newRecord && formik.errors.newRecord}
           sx={{ marginBlock: '8px' }}
         />
+
         <Button
           sx={{ marginBlock: '8px' }}
           color="primary"

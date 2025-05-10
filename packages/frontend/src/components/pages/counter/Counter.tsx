@@ -1,17 +1,17 @@
 import { Box } from '@mui/material';
 import BasicTabs from '../../organisms/BasicTabs';
-import AddConsumer from './AddConsumer';
-import ConsumerList from './ConsumerList';
+import AddCounter from './AddCounter';
+import CounterList from './CounterList';
 
-function Consumers() {
+function Counter() {
   return (
     <Box sx={{ background: 'linear-gradient(135deg, #f5f7fa, #c3cfe2)' }}>
       <BasicTabs
         labels={['List', 'Ajouter']}
-        components={[<ConsumerList />, <AddConsumer />]}
+        components={[<CounterList />, <AddCounter />]}
       />
     </Box>
   );
 }
 
-export default Consumers;
+export default Counter;

@@ -5,10 +5,12 @@
   "author": "Abderazak Amiar",
   "license": "MIT",
   "private": true,
-  "workspaces":["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "api:start":"yarn workspace @wcms/api start",
-    "frontend:dev":"yarn workspace @wcms/frontend dev",
-    "frontend:start":"yarn workspace @wcms/frontend start"
+    "api:start": "yarn workspace @wcms/api start",
+    "front:dev": "yarn workspace @wcms/frontend dev",
+    "front:start": "yarn workspace @wcms/frontend start"
   }
 }

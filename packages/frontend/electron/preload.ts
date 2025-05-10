@@ -1,24 +1,29 @@
-import { ipcRenderer, contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron';
 
-// --------- Expose some API to the Renderer process ---------
-contextBridge.exposeInMainWorld('ipcRenderer', {
-  on(...args: Parameters<typeof ipcRenderer.on>) {
-    const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
+contextBridge.exposeInMainWorld('electron', {
+  send: (channel: string, data?: unknown) => ipcRenderer.send(channel, data),
+  on: (channel: string, callback: (...args: any[]) => void) => {
+    ipcRenderer.on(channel, (_event, ...args) => callback(...args));
   },
-  off(...args: Parameters<typeof ipcRenderer.off>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.off(channel, ...omit)
-  },
-  send(...args: Parameters<typeof ipcRenderer.send>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.send(channel, ...omit)
-  },
-  invoke(...args: Parameters<typeof ipcRenderer.invoke>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.invoke(channel, ...omit)
+  off: (channel: string, callback: (...args: any[]) => void) => {
+    ipcRenderer.removeListener(channel, callback);
   },
 
-  // You can expose other APTs you need here.
-  // ...
-})
+  // ✅ Structured cloning for invoice IDs
+  printInvoices: (invoiceIds: string[]) => {
+    if (
+      !Array.isArray(invoiceIds) ||
+      invoiceIds.some((id) => typeof id !== 'string')
+    ) {
+      console.error('Invalid invoiceIds:', invoiceIds);
+      return;
+    }
+    ipcRenderer.send('print-invoices', invoiceIds);
+  },
+
+  // ✅ Properly handle Blob to Buffer conversion
+  savePDFs: async (zipBlob: Blob) => {
+    const arrayBuffer = await zipBlob.arrayBuffer(); // Convert Blob to ArrayBuffer
+    return ipcRenderer.invoke('save-pdfs', Buffer.from(arrayBuffer)); // Convert to Buffer
+  },
+});

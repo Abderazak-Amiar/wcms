@@ -1,44 +1,39 @@
-import { app, BrowserWindow, Menu } from 'electron';
-// import { createRequire } from 'node:module'
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// The built directory structure
-//
-// ├─┬─┬ dist
-// │ │ └── index.html
-// │ │
-// │ ├─┬ dist-electron
-// │ │ ├── main.js
-// │ │ └── preload.mjs
-// │
 process.env.APP_ROOT = path.join(__dirname, '..');
 
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
-export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
+export const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
-
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
   : RENDERER_DIST;
 
 let win: BrowserWindow | null;
+const pendingInvoices = new Set<string>();
 
-function createWindow() {
+function createWindow(): void {
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    show: false, // Hide initially to avoid flicker during resize
+    minimizable: true,
+    icon: path.join(process.env.VITE_PUBLIC as string, 'electron-vite.svg'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
-      devTools: false,
+      preload: path.join(app.getAppPath(), 'dist-electron', 'preload.mjs'),
+      devTools: true,
+      nodeIntegration: false,
+      contextIsolation: true,
     },
-    transparent: true,
   });
 
-  // Test active push message to Renderer-process.
+  win.once('ready-to-show', () => {
+    win?.maximize(); // ✅ Fill screen but keep taskbar visible
+    win?.show();
+  });
+
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', new Date().toLocaleString());
   });
@@ -46,66 +41,89 @@ function createWindow() {
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    // win.loadFile('dist/index.html')
     win.loadFile(path.join(RENDERER_DIST, 'index.html'));
   }
 
-  const template: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'delete' },
-        { type: 'separator' },
-        { role: 'selectAll' },
-      ],
-    },
-
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
-      ],
-    },
-
-    {
-      label: 'Window',
-      submenu: [{ role: 'minimize' }, { role: 'close' }],
-    },
-  ];
-
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
+  win.on('closed', () => {
+    win = null;
+  });
 }
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-    win = null;
+/** ✅ Print Invoices */
+ipcMain.on('print-invoices', async (_event, invoiceIds: string[]) => {
+  if (!win) return;
+
+  if (
+    !Array.isArray(invoiceIds) ||
+    invoiceIds.some((id) => typeof id !== 'string')
+  ) {
+    console.error('❌ Invalid invoice IDs received:', invoiceIds);
+    return;
+  }
+
+  for (const invoiceId of invoiceIds) {
+    pendingInvoices.add(invoiceId);
+    win.webContents.send('load-invoice', invoiceId);
   }
 });
 
+/** ✅ Renderer confirms invoice is ready */
+ipcMain.on('invoice-ready', (_event, invoiceId) => {
+  if (!win || !pendingInvoices.has(invoiceId)) return;
+
+  console.log(`🖨️ Printing invoice: ${invoiceId}`);
+  win.webContents.print(
+    {
+      silent: true,
+      printBackground: true,
+      color: false,
+      copies: 1,
+      landscape: false,
+      margins: { marginType: 'default' },
+    },
+    (success) => {
+      if (success) {
+        console.log(`✅ Printed invoice ${invoiceId} successfully.`);
+      } else {
+        console.error(`❌ Failed to print invoice ${invoiceId}.`);
+      }
+      pendingInvoices.delete(invoiceId);
+    },
+  );
+});
+
+/** ✅ Save PDF invoices */
+ipcMain.handle('save-pdfs', async (_event, zipBuffer: Buffer) => {
+  const { filePath } = await dialog.showSaveDialog({
+    title: 'Save Invoices',
+    defaultPath: path.join(app.getPath('documents'), 'invoices.zip'),
+    filters: [{ name: 'ZIP Files', extensions: ['zip'] }],
+  });
+
+  if (filePath) {
+    fs.writeFileSync(filePath, zipBuffer);
+    return true;
+  }
+  return false;
+});
+
+/** ✅ Lifecycle Hooks */
+
+// Stop API when app is closed
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+// Recreate window on MacOS when clicking app icon
 app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
 });
 
-app.whenReady().then(createWindow);
+// ✅ Start API when Electron starts
+app.whenReady().then(() => {
+  createWindow();
+});
