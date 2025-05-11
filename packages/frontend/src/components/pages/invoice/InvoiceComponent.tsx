@@ -10,6 +10,10 @@ import {
   Typography,
 } from '@mui/material';
 import moment from 'moment';
+import 'moment/locale/fr'; // 🇫🇷 importer la locale française
+
+moment.locale('fr'); // ✅ activer le français
+
 import React from 'react';
 
 type Invoice = {
@@ -50,16 +54,25 @@ type Settings = {
     deadline: string;
   };
 };
-interface InvoiceProps {
+type InvoiceProps = {
   invoice: Invoice;
   settings: Settings;
-}
-
-const InvoiceComponent: React.FC<InvoiceProps> = ({ invoice, settings }) => {
+  debts: Debt[] | undefined;
+};
+export type Debt = {
+  amount: string;
+  createdAt: string;
+  debtID: string;
+  invoiceID: string;
+  isPaid: boolean;
+};
+const InvoiceComponent: React.FC<InvoiceProps> = ({
+  invoice,
+  settings,
+  debts,
+}) => {
   const quantityConsumed =
     (invoice?.record?.newRecord ?? 0) - (invoice?.record?.oldRecord ?? 0);
-
-  console.log('==>invoice', invoice);
 
   return (
     <Box p={2}>
@@ -219,22 +232,28 @@ const InvoiceComponent: React.FC<InvoiceProps> = ({ invoice, settings }) => {
             <TableRow>
               <TableCell>{invoice?.amount} DA</TableCell>
               <TableCell>
-                {invoice?.isPaid && !invoice?.debt?.isPaid
+                {invoice?.isPaid && invoice?.debt && !invoice?.debt?.isPaid
                   ? (
                       Number(invoice?.amount) - Number(invoice?.debt?.amount)
                     ).toFixed(2) + ' DA'
-                  : '0 DA'}
+                  : invoice?.isPaid
+                  ? Number(invoice?.amount).toFixed(2) + ' DA'
+                  : '00.00 DA'}
               </TableCell>
             </TableRow>
           </TableBody>
         </Table>
       </TableContainer>
+
       <TableContainer component={Paper} sx={{ mb: 3 }}>
         <Table>
           <TableHead>
             <TableRow>
               <TableCell>
-                <b>Dette</b>
+                <b>Factures en Dette</b>
+              </TableCell>
+              <TableCell>
+                <b>Montant</b>
               </TableCell>
               <TableCell>
                 <b>Date</b>
@@ -242,14 +261,23 @@ const InvoiceComponent: React.FC<InvoiceProps> = ({ invoice, settings }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            <TableRow>
-              <TableCell>
-                {Number(invoice?.debt?.amount ?? 0).toFixed(2)} DA
-              </TableCell>
-              <TableCell>
-                {moment(invoice?.debt?.createdAt).format('DD MMM YYYY')}
-              </TableCell>
-            </TableRow>
+            {debts &&
+              debts
+                .filter(
+                  (debt: Debt) =>
+                    debt.invoiceID !== invoice.invoiceID && !debt?.isPaid,
+                )
+                .map((debt: Debt) => (
+                  <TableRow key={debt.invoiceID}>
+                    <TableCell>{debt?.invoiceID ?? ''}</TableCell>
+                    <TableCell>
+                      {Number(debt?.amount ?? 0).toFixed(2)} DA
+                    </TableCell>
+                    <TableCell>
+                      {moment(debt?.createdAt).format('DD MMM YYYY')}
+                    </TableCell>
+                  </TableRow>
+                ))}
           </TableBody>
         </Table>
       </TableContainer>
@@ -258,8 +286,8 @@ const InvoiceComponent: React.FC<InvoiceProps> = ({ invoice, settings }) => {
       <Box textAlign="right" my={2}>
         <Typography variant="h6">
           Montant total:{' '}
-          {invoice?.isPaid && !invoice?.debt?.isPaid
-            ? Number(invoice?.debt?.amount).toFixed(2) + ' DA'
+          {invoice?.isPaid && invoice?.debt && !invoice?.debt?.isPaid
+            ? Number(invoice?.debt?.amount).toFixed(2)
             : invoice?.amount}{' '}
           DA
         </Typography>

@@ -19,6 +19,9 @@ import {
 } from '@mui/material';
 import { useFormik } from 'formik';
 import moment from 'moment';
+import 'moment/locale/fr'; // 🇫🇷 importer la locale française
+moment.locale('fr'); // ✅ activer le français
+
 import { enqueueSnackbar } from 'notistack';
 import { useEffect, useState } from 'react';
 import * as yup from 'yup';

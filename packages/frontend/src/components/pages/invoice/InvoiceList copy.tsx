@@ -28,6 +28,10 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import moment from 'moment';
+import 'moment/locale/fr'; // 🇫🇷 importer la locale française
+
+moment.locale('fr'); // ✅ activer le français
+
 import React, { useEffect, useState } from 'react';
 import {
   DELETE_INVOICE,
@@ -717,7 +721,6 @@ const InvoiceList: React.FC = () => {
           {/* isPrinted Filter */}
           <Grid item xs={12} sm={3}>
             <FormControl fullWidth variant="outlined" size="small">
-  
               <Autocomplete
                 value={
                   options.find((option) => option.value === isPrintedFilter) ||

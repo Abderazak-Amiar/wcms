@@ -27,6 +27,7 @@ type Counter {
 type Consumer {
     consumerID: ID!
     fullName: String!
+    phone: String
     createdAt: String!
     updatedAt: String
     user: User
@@ -128,12 +129,12 @@ type Query {
 }
 
 type Mutation {
-    addConsumer(fullName: String!): Consumer!
+    addConsumer(fullName: String!, phone: String): Consumer!
     addPayment(consumerID: ID!, invoiceID:String!, paidAmount:Float!): Payment!
     addRecord(newRecord: String!, counterID: ID!, consumerID: ID!, period:String!): Record!
     updateRecord(recordID:ID!, newRecord: String!, counterID: ID!, consumerID: ID!, period:String!): Record!
     addCounter(counterID: ID!, consumerID: ID!, price: String!): Counter!
-    updateConsumer(consumerID: ID!, fullName: String!): Consumer
+    updateConsumer(consumerID: ID!, fullName: String!, phone: String): Consumer
     updateCounter(counterID: ID!, status: String!, price: String!, consumerID:ID!): ResponseMessage
     deleteConsumers(consumerIDs: [ID!]!): ResponseMessage
     deleteCounters(counterIDs: [ID!]!): ResponseMessage
@@ -434,13 +435,14 @@ export const resolvers = {
         });
       }),
 
-    addConsumer: (_, { fullName }) =>
+    addConsumer: (_, { fullName, phone }) =>
       new Promise((resolve, reject) => {
         if (!db.open) return reject(new Error('Database is closed'));
 
         const newConsumer = {
           consumerID: nanoid(),
           fullName: fullName.trim(),
+          phone: phone.trim(),
           createdAt: new Date().toISOString(),
           userID: '1',
         };
@@ -453,10 +455,11 @@ export const resolvers = {
             if (row) return reject(new Error('DUPLICATION'));
 
             db.run(
-              `INSERT INTO consumer (consumerID, fullName, createdAt, userID) VALUES (?, ?, ?, ?)`,
+              `INSERT INTO consumer (consumerID, fullName, phone, createdAt, userID) VALUES (?, ?, ?, ?, ?)`,
               [
                 newConsumer.consumerID,
                 newConsumer.fullName,
+                newConsumer.phone,
                 newConsumer.createdAt,
                 newConsumer.userID,
               ],
@@ -470,27 +473,49 @@ export const resolvers = {
       }),
     updateConsumer: (parent, args) => {
       return new Promise((resolve, reject) => {
+        const fields = [];
+        const values = [];
+
+        if (args.fullName) {
+          fields.push('fullName = ?');
+          values.push(args.fullName);
+        }
+
+        if (args.phone) {
+          fields.push('phone = ?');
+          values.push(args.phone);
+        }
+
+        // No fields to update
+        if (fields.length === 0) {
+          return reject(new Error('No fields to update.'));
+        }
+
+        values.push(args.consumerID); // WHERE clause value
+
+        const sql = `UPDATE consumer SET ${fields.join(
+          ', ',
+        )} WHERE consumerID = ?`;
+
         db.serialize(() => {
-          db.run(
-            `UPDATE consumer SET fullName = ? WHERE consumerID = ?`,
-            [args.fullName, args.consumerID],
-            function (err) {
-              if (err) {
-                console.error(err.message);
-                reject(new Error('Failed to update consumer.'));
-              } else if (this.changes === 0) {
-                reject(new Error('Consumer not found.'));
-              } else {
-                resolve({
-                  consumerID: args.consumerID,
-                  fullName: args.fullName,
-                });
-              }
-            },
-          );
+          db.run(sql, values, function (err) {
+            if (err) {
+              console.error(err.message);
+              reject(new Error('Failed to update consumer.'));
+            } else if (this.changes === 0) {
+              reject(new Error('Consumer not found.'));
+            } else {
+              resolve({
+                consumerID: args.consumerID,
+                fullName: args.fullName || null,
+                phone: args.phone || null,
+              });
+            }
+          });
         });
       });
     },
+
     updateCounter: (parent, args) => {
       return new Promise((resolve, reject) => {
         db.serialize(() => {

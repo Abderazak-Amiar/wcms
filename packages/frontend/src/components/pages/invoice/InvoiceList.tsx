@@ -30,6 +30,10 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import moment from 'moment';
+import 'moment/locale/fr'; // 🇫🇷 importer la locale française
+
+moment.locale('fr'); // ✅ activer le français
+
 import React, { useEffect, useState } from 'react';
 import {
   DELETE_INVOICE,
@@ -102,7 +106,7 @@ const generateInvoicePDF = (
   const quantityConsumed =
     (invoice?.record?.newRecord ?? 0) - (invoice?.record?.oldRecord ?? 0);
   const doc = new jsPDF();
-
+  console.log('==>debts', debts);
   // Header Section
   autoTable(doc, {
     body: [
@@ -303,10 +307,10 @@ const generateInvoicePDF = (
     styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
   });
   const visibleDebts = debts.filter((debt) => Number(debt.amount) > 0);
-
+  console.log('==>visibleDebts', visibleDebts);
   if (visibleDebts.length > 0) {
     autoTable(doc, {
-      head: [['Dettes', 'Montant', 'Date']],
+      head: [['Factures en Dette', 'Montant', 'Date']],
       body: visibleDebts.map((debt) => [
         debt.invoiceID?.substring(0, 8) || 'N/A',
         `${debt.amount} DA`,
@@ -557,6 +561,7 @@ const InvoiceList: React.FC = () => {
         });
 
         const debts = consumerDebtData?.getDebtsByConsumer || [];
+        console.log('==>debts', debts);
 
         const doc = generateInvoicePDF(invoice, dataSettings, debts);
         const pdfBlob = doc.output('blob');
@@ -587,7 +592,6 @@ const InvoiceList: React.FC = () => {
     refetch();
   };
 
-  console.log('==>dataa', data);
   const filteredInvoices = data?.invoices?.filter((invoice) => {
     const isPaid = invoice?.isPaid === true;
     const debt = invoice?.debt;
