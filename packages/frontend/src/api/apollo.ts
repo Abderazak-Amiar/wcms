@@ -341,10 +341,10 @@ export const UPDATE_INVOICE = gql`
 `;
 
 export const updateUser = gql`
-  mutation UpdateUser(
+  mutation updateUser(
     $userID: ID!
     $userName: String!
-    $password: String!
+    $password: String
     $role: String!
   ) {
     updateUser(
@@ -353,10 +353,35 @@ export const updateUser = gql`
       password: $password
       role: $role
     ) {
+      message
+      success
+    }
+  }
+`;
+
+export const addUser = gql`
+  mutation addUser($userName: String!, $password: String!, $role: String!) {
+    addUser(userName: $userName, password: $password, role: $role) {
+      userID
+    }
+  }
+`;
+
+export const getUsers = gql`
+  query GetUsers {
+    users {
       userID
       userName
       role
-      updatedAt
+      createdAt
+    }
+  }
+`;
+export const deleteUsers = gql`
+  mutation DeleteUsers($userIDs: [ID!]!) {
+    deleteUsers(userIDs: $userIDs) {
+      message
+      success
     }
   }
 `;
