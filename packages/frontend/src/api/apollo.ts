@@ -75,17 +75,22 @@ export const deleteCounters = gql`
 `;
 
 export const addConsumer = gql`
-  mutation ($fullName: String!) {
-    addConsumer(fullName: $fullName) {
+  mutation ($fullName: String!, $phone: String) {
+    addConsumer(fullName: $fullName, phone: $phone) {
       consumerID
     }
   }
 `;
 export const updateConsumer = gql`
-  mutation ($consumerID: ID!, $fullName: String!) {
-    updateConsumer(consumerID: $consumerID, fullName: $fullName) {
+  mutation ($consumerID: ID!, $fullName: String!, $phone: String!) {
+    updateConsumer(
+      consumerID: $consumerID
+      fullName: $fullName
+      phone: $phone
+    ) {
       consumerID
       fullName
+      phone
     }
   }
 `;
@@ -95,6 +100,7 @@ export const getConsumers = gql`
     consumers {
       consumerID
       fullName
+      phone
       createdAt
       counters {
         counterID
@@ -214,6 +220,7 @@ export const getDebtsByConsumer = gql`
   query getDebtsByConsumer($consumerID: ID!) {
     getDebtsByConsumer(consumerID: $consumerID) {
       debtID
+      isPaid
       amount
       createdAt
       invoiceID

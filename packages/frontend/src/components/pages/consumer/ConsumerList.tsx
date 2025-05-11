@@ -30,6 +30,10 @@ import {
 import { alpha } from '@mui/material/styles';
 import { visuallyHidden } from '@mui/utils';
 import moment from 'moment';
+import 'moment/locale/fr'; // 🇫🇷 importer la locale française
+
+moment.locale('fr'); // ✅ activer le français
+
 import { enqueueSnackbar } from 'notistack';
 import React, { useEffect, useState } from 'react';
 import {
@@ -42,6 +46,7 @@ import DeleteConfirmationDialog from '../../molecules/DeleteConfirmationDialog';
 interface Consumer {
   consumerID: string;
   fullName: string;
+  phone: string;
   createdAt: string;
 }
 
@@ -84,6 +89,12 @@ const headCells: readonly HeadCell[] = [
     numeric: false,
     disablePadding: false,
     label: 'Nom complet',
+  },
+  {
+    id: 'phone',
+    numeric: false,
+    disablePadding: false,
+    label: 'Téléphone',
   },
   {
     id: 'createdAt',
@@ -242,7 +253,7 @@ export default function ConsumerList() {
     null,
   );
   const [deleteTarget, setDeleteTarget] = useState<string[]>([]);
-
+  console.log('==>consumers', consumers);
   useEffect(() => {
     if (data?.consumers) {
       setConsumers(data.consumers);
@@ -365,6 +376,7 @@ export default function ConsumerList() {
       variables: {
         consumerID: selectedConsumer.consumerID,
         fullName: selectedConsumer.fullName,
+        phone: selectedConsumer.phone,
       },
     });
   };
@@ -425,6 +437,7 @@ export default function ConsumerList() {
                       {row.consumerID}
                     </TableCell>
                     <TableCell align="left">{row.fullName}</TableCell>
+                    <TableCell align="left">{row.phone}</TableCell>
                     <TableCell align="left">
                       {moment(row.createdAt).format('DD MMM YYYY')}
                     </TableCell>
@@ -475,6 +488,17 @@ export default function ConsumerList() {
             onChange={(e) =>
               setSelectedConsumer((prev) =>
                 prev ? { ...prev, fullName: e.target.value } : null,
+              )
+            }
+          />
+          <TextField
+            fullWidth
+            margin="dense"
+            label="Téléphone"
+            value={selectedConsumer?.phone || ''}
+            onChange={(e) =>
+              setSelectedConsumer((prev) =>
+                prev ? { ...prev, phone: e.target.value } : null,
               )
             }
           />
