@@ -32,6 +32,10 @@ import {
 import { alpha } from '@mui/material/styles';
 import { visuallyHidden } from '@mui/utils';
 import moment from 'moment';
+import 'moment/locale/fr'; // 🇫🇷 importer la locale française
+
+moment.locale('fr'); // ✅ activer le français
+
 import { enqueueSnackbar } from 'notistack';
 import React, { useEffect, useState } from 'react';
 import {
@@ -273,7 +277,9 @@ const EditDialog = ({ open, onClose, counter, onSave }: EditDialogProps) => {
         <Autocomplete
           options={['En Marche', 'En Arrêt', 'Coupé']}
           value={editedCounter?.status || ''}
-          onChange={(_event, newValue) => handleChange('status', newValue || '')}
+          onChange={(_event, newValue) =>
+            handleChange('status', newValue || '')
+          }
           renderInput={(params) => (
             <TextField {...params} label="Status" margin="dense" fullWidth />
           )}

@@ -10,6 +10,7 @@ import { addConsumerType } from './AddConsumer.type';
 function AddConsumer() {
   const initialValues: addConsumerType = {
     fullName: '',
+    phone: '',
   };
 
   const [consumer, setConsumer] = useState<addConsumerType>(initialValues);
@@ -73,6 +74,18 @@ function AddConsumer() {
           onBlur={formik.handleBlur}
           error={formik.touched.fullName && Boolean(formik.errors.fullName)}
           helperText={formik.touched.fullName && formik.errors.fullName}
+          sx={{ marginBlock: '8px' }}
+        />
+        <TextField
+          fullWidth
+          id="phone"
+          name="phone"
+          label="Téléphone"
+          value={formik.values.phone}
+          onChange={formik.handleChange}
+          onBlur={formik.handleBlur}
+          error={formik.touched.phone && Boolean(formik.errors.phone)}
+          helperText={formik.touched.phone && formik.errors.phone}
           sx={{ marginBlock: '8px' }}
         />
         <Button
