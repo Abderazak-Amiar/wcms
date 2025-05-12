@@ -9,9 +9,9 @@ import Logout from './components/pages/Logout';
 import Payment from './components/pages/Payment';
 import Protected from './components/pages/Protected';
 import AddRecord from './components/pages/record/AddRecord';
-import Settings from './components/pages/Settings';
-import Welcome from './components/pages/Welcome';
 import Reports from './components/pages/Reports';
+import Settings from './components/pages/settings/Settings';
+import Welcome from './components/pages/Welcome';
 
 function App() {
   return (
