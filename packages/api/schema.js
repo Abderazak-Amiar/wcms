@@ -1,5 +1,6 @@
 import moment from 'moment';
 import { customAlphabet } from 'nanoid';
+import { Error } from 'sequelize';
 import { db } from './db.js';
 const nanoid = customAlphabet('1234567890abcdef', 8);
 
@@ -138,6 +139,7 @@ type Mutation {
     updateCounter(counterID: ID!, status: String!, price: String!, consumerID:ID!): ResponseMessage
     deleteConsumers(consumerIDs: [ID!]!): ResponseMessage
     deleteCounters(counterIDs: [ID!]!): ResponseMessage
+    deleteUsers(userIDs: [ID!]!): ResponseMessage
     addSettings(m3price: Float!, village: String!, phone: String, email:String, deadline: String!): Settings!
     updateSettings(m3Price: String!, village: String!): Settings!
     updateInvoicePrinted(invoiceID: String!): Invoice
@@ -163,7 +165,8 @@ type Mutation {
   ): Invoice
 
   deleteInvoice(invoiceID: ID!): Invoice
-  updateUser(userID: ID!, userName: String, password: String, role: String): User
+  updateUser(userID: ID!, userName: String, password: String, role: String): ResponseMessage
+  addUser(userName: String!, password: String!, role: String!):User
 }
 
 `;
@@ -1226,6 +1229,21 @@ export const resolvers = {
           },
         );
       }),
+    deleteUsers: (_, { userIDs }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+
+        db.run(
+          `DELETE FROM user WHERE userID IN (${userIDs
+            .map(() => '?')
+            .join(', ')})`,
+          userIDs,
+          function (err) {
+            if (err) reject(err);
+            resolve({ success: true, message: 'Users deleted' });
+          },
+        );
+      }),
     updateInvoicePrinted: async (_, { invoiceID }) => {
       try {
         if (!db) throw new Error('Database connection not established');
@@ -1245,6 +1263,33 @@ export const resolvers = {
         throw new Error('Failed to update invoice');
       }
     },
+    addUser: (_, { userName, password, role }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+        const createdAt = new Date().toISOString();
+        const userID = nanoid();
+        const newUser = {
+          userID: userID,
+          userName: userName,
+          role: role,
+          password: password,
+          createdAt: createdAt,
+        };
+        db.run(
+          `INSERT INTO user (userID, userName, role, password, createdAt) VALUES(?,?,?,?,?)`,
+          [
+            newUser.userID,
+            newUser.userName,
+            newUser.role,
+            newUser.password,
+            newUser.createdAt,
+          ],
+          function (err) {
+            if (err) return reject(err);
+            resolve(newUser);
+          },
+        );
+      }),
     updateUser: (_, { userID, userName, password, role }) =>
       new Promise((resolve, reject) => {
         if (!db.open) return reject(new Error('Database is closed'));
@@ -1260,15 +1305,18 @@ export const resolvers = {
           WHERE userID = ?`,
           [userName, password, role, updatedAt, userID],
           function (err) {
-            if (err) return reject(err);
+            if (err) return reject(err.message);
             if (this.changes === 0) return reject(new Error('User not found'));
 
             db.get(
               `SELECT * FROM user WHERE userID = ?`,
               [userID],
-              (err, row) => {
+              (err) => {
                 if (err) return reject(err);
-                resolve(row);
+                resolve({
+                  success: true,
+                  message: 'Utilisateur mise à jour',
+                });
               },
             );
           },

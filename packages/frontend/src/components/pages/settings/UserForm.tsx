@@ -3,7 +3,7 @@ import { Autocomplete, Button, TextField, Typography } from '@mui/material';
 import { useFormik } from 'formik';
 import { enqueueSnackbar } from 'notistack';
 import * as yup from 'yup';
-import { getUserByID, updateUser } from '../../api/apollo'; // Assume this mutation exists
+import { getUserByID, updateUser } from '../../../api/apollo'; // Assume this mutation exists
 
 type User = {
   userID: string;
@@ -126,7 +126,7 @@ function UserForm() {
           }}
         />
         <Autocomplete
-          options={['admin', 'user']}
+          options={['administrateur', 'utilisateur']}
           value={formik.values.role}
           onChange={(_event, newValue) =>
             formik.setFieldValue('role', newValue)
