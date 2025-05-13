@@ -1,12 +1,8 @@
-import AssessmentIcon from '@mui/icons-material/Assessment';
 import CountertopsIcon from '@mui/icons-material/Countertops';
-import GasMeterIcon from '@mui/icons-material/GasMeter';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PaidIcon from '@mui/icons-material/Paid';
-import PeopleIcon from '@mui/icons-material/People';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import ReceiptIcon from '@mui/icons-material/Receipt';
-import SettingsIcon from '@mui/icons-material/Settings';
 import {
   List,
   ListItem,
@@ -18,40 +14,17 @@ import {
 import { SnackbarProvider } from 'notistack';
 import { Link, Outlet } from 'react-router-dom';
 
-function Layout() {
+function LayoutUser() {
   const icons = [
     <CountertopsIcon />,
-    <PeopleIcon />,
-    <GasMeterIcon />,
     <ReceiptIcon />,
     <PaidIcon />,
     <PointOfSaleIcon />,
-    <AssessmentIcon />,
-    <SettingsIcon />,
     <LogoutIcon />,
   ];
-  const menuFr = [
-    'Recensement',
-    'Consommateur',
-    'Compteur',
-    'Facture',
-    'Paiement',
-    'Dette',
-    'Rapports',
-    'Paramètres',
-  ];
-  const menu = [
-    'record',
-    'consumer',
-    'counter',
-    'invoice',
-    'payment',
-    'debt',
-    'reports',
-    'settings',
-  ];
-  const {role} = JSON.parse(localStorage.getItem('token') ?? '');
-  console.log('==>role',role);
+  const menuFr = ['Recensement', 'Facture', 'Paiement'];
+  const menu = ['record', 'invoice', 'payment'];
+
   return (
     <div style={{ display: 'flex', height: '100vh' }}>
       {/* Sidebar */}
@@ -102,4 +75,4 @@ function Layout() {
   );
 }
 
-export default Layout;
+export default LayoutUser;

@@ -1,11 +1,10 @@
 import { Box } from '@mui/material';
 import BasicTabs from '../../organisms/BasicTabs';
 import AddUser from './AddUser';
-import UserForm from './UserForm';
 import UserList from './UserList';
 import UserSetting from './UserSetting';
 
-function AddSettings() {
+function Settings() {
   return (
     <Box sx={{ background: 'linear-gradient(135deg, #f5f7fa, #c3cfe2)' }}>
       <BasicTabs
@@ -20,4 +19,4 @@ function AddSettings() {
   );
 }
 
-export default AddSettings;
+export default Settings;

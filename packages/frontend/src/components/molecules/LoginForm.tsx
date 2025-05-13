@@ -9,9 +9,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as yup from 'yup';
 import { getUser } from '../../api/apollo';
+import { useAuthStore } from '../../store/useAuthStore';
 import { userLoginType } from './LoginForm.type';
 
 function LoginForm() {
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
   const navigate = useNavigate();
   const theme = useTheme();
   const initialValues: userLoginType = {
@@ -25,7 +27,7 @@ function LoginForm() {
     userName: yup.string().required('Utilisateur requis'),
     password: yup
       .string()
-      .min(3, 'Le mot de passe doit contenir au minimum 8 caractères')
+      .min(6, 'Le mot de passe doit contenir au minimum 6 caractères')
       .required('Mot de passe requis'),
   });
 
@@ -41,21 +43,25 @@ function LoginForm() {
     setUser(formik.values);
   }, [formik.values]);
 
-  const [submit, { loading, error, data }] = useLazyQuery(getUser);
-  if (loading) {
-    console.log('==>loading', loading);
-  }
-  if (error) {
-    console.log('==>error', error);
-  }
+  const setRole = useAuthStore((state) => state.setRole);
 
-  useEffect(() => {
-    if (data?.userLogin) {
-      localStorage.setItem('token', data.userLogin.userID);
-      navigate('/welcome');
-    }
-  }, [data, navigate]);
-
+  const [submit] = useLazyQuery(getUser, {
+    onCompleted: (data) => {
+      if (data?.userLogin.success) {
+        const { role } = JSON.parse(data.userLogin.data);
+        localStorage.setItem('token', data.userLogin.data);
+        setRole(role);
+        navigate('/welcome');
+        setIsLoggedIn(true);
+      } else {
+        setIsLoggedIn(false);
+      }
+    },
+    onError: (err) => {
+      console.log('==>err', err);
+    },
+  });
+console.log('==>isLoggedIn',isLoggedIn);
   return (
     <div className="login-form-container">
       <form onSubmit={formik.handleSubmit} className="login-form">
@@ -74,6 +80,7 @@ function LoginForm() {
           fullWidth
           id="userName"
           name="userName"
+          type="text"
           label="Utilisateur"
           value={formik.values.userName}
           onChange={formik.handleChange}
@@ -95,6 +102,11 @@ function LoginForm() {
           helperText={formik.touched.password && formik.errors.password}
           sx={{ marginBlock: '8px' }}
         />
+        {!isLoggedIn && (
+          <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+            Nom d'utilisateur ou mot de passe incorrect
+          </Typography>
+        )}
         <Button
           sx={{ marginBlock: '8px' }}
           color="primary"
@@ -107,14 +119,14 @@ function LoginForm() {
         </Button>
         <Grid container sx={{ justifyContent: 'space-between' }}>
           <Grid>
-            <Typography sx={{ color: theme.palette.grey[300] }}>
+            <Typography sx={{ color: theme.palette.grey[500] }}>
               Developpé par Abderazak Amiar
             </Typography>
           </Grid>
           <Grid>
             <Typography>
               <Link
-                sx={{ textDecoration: 'none', color: theme.palette.grey[300] }}
+                sx={{ textDecoration: 'none', color: theme.palette.grey[500] }}
                 href="https://www.linkedin.com/in/zakamiar/"
               >
                 <LinkedInIcon />
