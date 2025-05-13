@@ -9,9 +9,9 @@ export const client = new ApolloClient({
 export const getUser = gql`
   query ($userName: String!, $password: String!) {
     userLogin(userName: $userName, password: $password) {
-      userID
-      userName
-      role
+      message
+      success
+      data
     }
   }
 `;

@@ -9,6 +9,7 @@ function Login() {
   useEffect(() => {
     (async () => {
       const auth = await isAuthenticated();
+      console.log('==>auth', auth);
       if (auth) {
         navigate('/welcome');
       }
