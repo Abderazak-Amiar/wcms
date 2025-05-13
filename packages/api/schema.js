@@ -110,12 +110,13 @@ type Settings {
 type ResponseMessage {
   success: Boolean!
   message: String!
+  data: String
 }
 
 type Query {
     users: [User]
     user(userID: ID!): User
-    userLogin(userName: String!, password: String!): User
+    userLogin(userName: String!, password: String!): ResponseMessage
     counters: [Counter]
     counter(counterID: ID!): Counter
     consumers: [Consumer]
@@ -209,8 +210,18 @@ export const resolvers = {
                 console.error(err.message);
                 reject();
               }
-              resolve(row);
-              console.log('==>row', row);
+              if(row){
+                resolve({
+                  message: 'LoggedIn successfully',
+                  success: true,
+                  data: JSON.stringify(row),
+                });
+              }
+              resolve({
+                message: 'password or username is incorrect',
+                success: false,
+                data: JSON.stringify(row),
+              });
             },
           );
         });
@@ -1308,17 +1319,13 @@ export const resolvers = {
             if (err) return reject(err.message);
             if (this.changes === 0) return reject(new Error('User not found'));
 
-            db.get(
-              `SELECT * FROM user WHERE userID = ?`,
-              [userID],
-              (err) => {
-                if (err) return reject(err);
-                resolve({
-                  success: true,
-                  message: 'Utilisateur mise à jour',
-                });
-              },
-            );
+            db.get(`SELECT * FROM user WHERE userID = ?`, [userID], (err) => {
+              if (err) return reject(err);
+              resolve({
+                success: true,
+                message: 'Utilisateur mise à jour',
+              });
+            });
           },
         );
       }),
