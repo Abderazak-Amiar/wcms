@@ -565,7 +565,10 @@ const InvoiceList: React.FC = () => {
 
         const doc = generateInvoicePDF(invoice, dataSettings, debts);
         const pdfBlob = doc.output('blob');
-        zip.file(`Facture_${invoice?.consumer?.fullName}.pdf`, pdfBlob);
+        zip.file(
+          `${invoice?.invoiceID}_${invoice?.consumer?.fullName}_${invoice?.record?.period}.pdf`,
+          pdfBlob,
+        );
 
         await updateInvoicePrinted({
           variables: { invoiceID: invoice.invoiceID },

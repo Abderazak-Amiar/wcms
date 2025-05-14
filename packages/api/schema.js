@@ -204,13 +204,13 @@ export const resolvers = {
       return new Promise((resolve, reject) => {
         db.serialize(() => {
           db.get(
-            `SELECT * FROM user WHERE userName='${args.userName}' AND password='${args.password}'`,
+            `SELECT userID, userName, role FROM user WHERE userName='${args.userName}' AND password='${args.password}'`,
             (err, row) => {
               if (err) {
                 console.error(err.message);
                 reject();
               }
-              if(row){
+              if (row) {
                 resolve({
                   message: 'LoggedIn successfully',
                   success: true,
