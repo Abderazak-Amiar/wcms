@@ -123,12 +123,14 @@ export const addRecord = gql`
     $consumerID: ID!
     $counterID: ID!
     $newRecord: String!
+    $oldRecord: String!
     $period: String!
   ) {
     addRecord(
       consumerID: $consumerID
       counterID: $counterID
       newRecord: $newRecord
+      oldRecord: $oldRecord
       period: $period
     ) {
       recordID
@@ -176,6 +178,8 @@ export const addSettings = gql`
     $phone: String
     $email: String
     $deadline: String!
+    $subscription: String!
+    $tax: String!
   ) {
     addSettings(
       m3price: $m3price
@@ -183,12 +187,16 @@ export const addSettings = gql`
       phone: $phone
       email: $email
       deadline: $deadline
+      subscription: $subscription
+      tax: $tax
     ) {
       m3price
       village
       phone
       email
       deadline
+      subscription
+      tax
     }
   }
 `;
@@ -200,6 +208,8 @@ export const getSettings = gql`
       phone
       email
       deadline
+      subscription
+      tax
     }
   }
 `;
@@ -382,6 +392,19 @@ export const deleteUsers = gql`
     deleteUsers(userIDs: $userIDs) {
       message
       success
+    }
+  }
+`;
+export const getRecordByConsumerID = gql`
+  query getRecordByConsumerID($consumerID: ID!) {
+    getRecordByConsumerID(consumerID: $consumerID) {
+      recordID
+      period
+      oldRecord
+      newRecord
+      recordDate
+      counterID
+      consumerID
     }
   }
 `;

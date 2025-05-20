@@ -84,6 +84,8 @@ type Settings = {
     phone: string;
     email: string;
     deadline: string;
+    subscription: string;
+    tax: string;
   };
 };
 type Debt = {
@@ -108,6 +110,7 @@ const generateInvoicePDF = (
   const doc = new jsPDF();
   console.log('==>debts', debts);
   // Header Section
+  console.log('====>>settings', settings);
   autoTable(doc, {
     body: [
       [
@@ -132,6 +135,7 @@ const generateInvoicePDF = (
       ],
     ],
     theme: 'plain',
+    startY: (doc.lastAutoTable?.finalY ?? 10) + 5,
   });
 
   // Invoice Details Table
@@ -172,6 +176,7 @@ const generateInvoicePDF = (
       ],
     ],
     theme: 'grid',
+    startY: (doc.lastAutoTable?.finalY ?? 10) + 5,
     styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
     columnStyles: {
       0: { cellWidth: 'auto' }, // First column (adjust as needed)
@@ -189,6 +194,7 @@ const generateInvoicePDF = (
       [invoice?.consumer?.fullName || '', invoice?.consumer?.consumerID || ''],
     ],
     theme: 'grid',
+    startY: (doc.lastAutoTable?.finalY ?? 10) + 5,
     styles: {
       lineColor: [200, 200, 200], // Light grey borders
       lineWidth: 0.5,
@@ -222,6 +228,7 @@ const generateInvoicePDF = (
       ],
     ],
     theme: 'grid',
+    startY: (doc.lastAutoTable?.finalY ?? 10) + 5,
     styles: {
       lineColor: [200, 200, 200], // Light grey borders
       lineWidth: 0.5,
@@ -248,6 +255,7 @@ const generateInvoicePDF = (
       [invoice?.counter?.counterID || '', invoice?.counter?.status || ''],
     ],
     theme: 'grid',
+    startY: (doc.lastAutoTable?.finalY ?? 10) + 5,
     styles: {
       lineColor: [200, 200, 200], // Light grey borders
       lineWidth: 0.5,
@@ -280,10 +288,10 @@ const generateInvoicePDF = (
       ],
     ],
     theme: 'grid',
+    startY: (doc.lastAutoTable?.finalY ?? 10) + 5,
     styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
   });
 
-  // Total Amount
   autoTable(doc, {
     body: [
       [
@@ -303,6 +311,7 @@ const generateInvoicePDF = (
         },
       ],
     ],
+    startY: (doc.lastAutoTable?.finalY ?? 10) + 5,
     theme: 'grid',
     styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
   });
@@ -316,7 +325,7 @@ const generateInvoicePDF = (
         `${debt.amount} DA`,
         moment(debt.createdAt).format('DD MMM YYYY'),
       ]),
-      startY: (doc.lastAutoTable?.finalY ?? 10) + 10,
+      startY: (doc.lastAutoTable?.finalY ?? 10) + 5, // Reduced space between tables
       theme: 'grid',
       styles: {
         lineColor: [200, 200, 200],
@@ -324,26 +333,65 @@ const generateInvoicePDF = (
       },
       headStyles: {
         fillColor: false,
-        textColor: [0, 0, 0],
-        fontStyle: 'bold',
+        textColor: [80, 80, 80], // Same text color as other titles
         halign: 'center',
-        fontSize: 12,
+        fontSize: 10,
       },
     });
   }
-  // Terms & Notes
+  // Total Amount
+  // Abonnement & Taxe & Montant Total
   autoTable(doc, {
     body: [
       [
         {
-          content: 'Note',
-          styles: { halign: 'left', fontSize: 14, fontStyle: 'bold' },
+          content: 'Abonnement:',
+          styles: { fontStyle: 'bold', halign: 'left' },
         },
         {
-          content: 'Indication',
-          styles: { halign: 'left', fontSize: 14, fontStyle: 'bold' },
+          content: `${Number(settings.getSettings.subscription).toFixed(2)} DA`,
+          styles: { halign: 'left' },
         },
       ],
+      [
+        {
+          content: 'Taxe de collecte des déchets ménagers:',
+          styles: { fontStyle: 'bold', halign: 'left' },
+        },
+        {
+          content: `${Number(settings.getSettings.tax).toFixed(2)} DA`,
+          styles: { halign: 'left' },
+        },
+      ],
+      [
+        {
+          content: 'Montant total:',
+          styles: { fontStyle: 'bold', halign: 'right' },
+        },
+        {
+          content:
+            invoice?.isPaid && invoice?.debt && !invoice?.debt?.isPaid
+              ? (
+                  Number(invoice?.debt?.amount) +
+                  Number(settings.getSettings.subscription) +
+                  Number(settings.getSettings.tax)
+                ).toFixed(2) + ' DA'
+              : (
+                  Number(invoice?.amount) +
+                  Number(settings.getSettings.subscription) +
+                  Number(settings.getSettings.tax)
+                ).toFixed(2) + ' DA',
+          styles: { fontStyle: 'bold', halign: 'right' },
+        },
+      ],
+    ],
+    theme: 'grid',
+    startY: (doc.lastAutoTable?.finalY ?? 10) + 5,
+    styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
+  });
+  // Terms & Notes
+  autoTable(doc, {
+    body: [
       [
         {
           content: `Veuillez, s'il vous plaît, vous approcher du bureau du comité du village\nafin de payer votre facture avant le ${moment(
@@ -353,15 +401,11 @@ const generateInvoicePDF = (
             .format(
               'DD MMM YYYY',
             )}.\nNous vous remercions pour votre fidélité.`,
-          styles: { halign: 'left', fontStyle: 'bolditalic' },
-        },
-        {
-          content: 'Payée (P)\nPartielement Payée (PP)\nNon Payée (NP)',
-          styles: { halign: 'left', fontStyle: 'bolditalic' },
+          styles: { halign: 'left', fontSize: 10, fontStyle: 'italic' },
         },
       ],
     ],
-    theme: 'grid',
+    theme: 'plain',
     styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
   });
   // Footer
@@ -565,7 +609,10 @@ const InvoiceList: React.FC = () => {
 
         const doc = generateInvoicePDF(invoice, dataSettings, debts);
         const pdfBlob = doc.output('blob');
-        zip.file(`Facture_${invoice?.consumer?.fullName}.pdf`, pdfBlob);
+        zip.file(
+          `${invoice?.invoiceID}_${invoice?.consumer?.fullName}_${invoice?.record?.period}.pdf`,
+          pdfBlob,
+        );
 
         await updateInvoicePrinted({
           variables: { invoiceID: invoice.invoiceID },

@@ -22,7 +22,18 @@ import * as d3 from 'd3';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable'; // Ensure autoTable is imported
 import { useEffect, useRef, useState } from 'react';
-import { GET_INVOICES } from '../../api/apollo';
+import { GET_INVOICES, getSettings } from '../../api/apollo';
+type Settings = {
+  getSettings: {
+    m3price: GLfloat;
+    village: string;
+    phone: string;
+    email: string;
+    deadline: string;
+    subscription: string;
+    tax: string;
+  };
+};
 
 type Invoice = {
   invoiceID: string;
@@ -56,6 +67,12 @@ type Invoice = {
 
 function Reports() {
   const { refetch, loading, error, data } = useQuery(GET_INVOICES);
+  const {
+    loading: loadingSettings,
+    error: errorSettings,
+    data: dataSettings,
+  } = useQuery<Settings>(getSettings);
+  console.log('==>Settings', dataSettings);
   const [startDate, setStartDate] = useState(
     new Date(new Date().setFullYear(new Date().getFullYear() - 1))
       .toISOString()
@@ -106,35 +123,37 @@ function Reports() {
     let totalDebt = 0;
     let paidInvoices = 0;
     let unpaidInvoices = 0;
-    let partiallyPaidInvoices = 0; // Add partially paid invoices count
-    let fullyPaidWithDebtAmount = 0; // Add amount for fully paid invoices with paid debt
+    let partiallyPaidInvoices = 0;
+    let fullyPaidWithDebtAmount = 0;
+    let totalSubscriptionAndTax = 0;
+
+    const subscription = parseFloat(
+      dataSettings?.getSettings?.subscription || '0',
+    );
+    const tax = parseFloat(dataSettings?.getSettings?.tax || '0');
 
     filteredInvoices.forEach((invoice: Invoice) => {
-      const amount = parseFloat(invoice.amount.toString()) || 0; // Ensure amount is a number
-      const debtAmount = parseFloat(invoice.debt?.amount || '0'); // Safely parse debt.amount as a number
+      const amount = parseFloat(invoice.amount.toString()) || 0;
+      const debtAmount = parseFloat(invoice.debt?.amount || '0');
 
       if (invoice.isPaid && (!invoice.debt || invoice.debt.isPaid === true)) {
-        // Fully paid invoice or debt is null/undefined or fully paid
         totalRevenue += amount;
         paidInvoices++;
-        if (invoice.debt?.isPaid === true) {
-          fullyPaidWithDebtAmount += amount; // Track fully paid invoices with paid debt
-        }
+        totalSubscriptionAndTax += subscription + tax;
       } else if (invoice.isPaid && invoice.debt?.isPaid === false) {
-        // Partially paid invoice with unpaid debt
         const paidAmount = amount - debtAmount;
-        totalRevenue += paidAmount; // Add the paid portion to revenue
-        totalDebt += debtAmount; // Add the unpaid portion to debt
-        partiallyPaidInvoices++; // Increment partially paid invoices count
+        totalRevenue += paidAmount;
+        totalDebt += debtAmount;
+        partiallyPaidInvoices++;
       } else if (!invoice.isPaid && invoice.debt?.isPaid === false) {
-        // Fully unpaid invoice or overpaid debt
-        totalDebt += debtAmount; // Add the full debt amount to debt
+        totalDebt += debtAmount;
         unpaidInvoices++;
       } else if (!invoice.isPaid) {
-        // Fully unpaid invoice with no debt
         unpaidInvoices++;
       }
     });
+
+    const grandTotal = totalRevenue + totalSubscriptionAndTax; // Calculate Grand Total
 
     return {
       totalRevenue,
@@ -143,6 +162,8 @@ function Reports() {
       unpaidInvoices,
       partiallyPaidInvoices,
       fullyPaidWithDebtAmount,
+      totalSubscriptionAndTax,
+      grandTotal, // Return Grand Total
     };
   };
 
@@ -554,6 +575,8 @@ function Reports() {
     paidInvoices = 0,
     unpaidInvoices = 0,
     partiallyPaidInvoices = 0,
+    totalSubscriptionAndTax = 0,
+    grandTotal = 0,
   } = calculateStats();
 
   return (
@@ -737,6 +760,20 @@ function Reports() {
                       </TableCell>
                     </TableRow>
                   )}
+                  <TableRow>
+                    <TableCell>
+                      Abonnement et Taxe de collecte des déchets ménagers
+                    </TableCell>
+                    <TableCell align="right">
+                      {totalSubscriptionAndTax.toFixed(2)} DA
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Grand Total</TableCell>
+                    <TableCell align="right">
+                      {grandTotal.toFixed(2)} DA
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </TableContainer>

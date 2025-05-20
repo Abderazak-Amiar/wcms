@@ -9,7 +9,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-image: url('taourirt.jpg');
+  background-image: url('./assets/taourirt.jpg');
   background-size: cover;
 }
 .login-form {

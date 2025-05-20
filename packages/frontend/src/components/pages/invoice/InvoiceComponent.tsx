@@ -52,6 +52,8 @@ type Settings = {
     phone: string;
     email: string;
     deadline: string;
+    subscription: string;
+    tax: string;
   };
 };
 type InvoiceProps = {
@@ -263,10 +265,7 @@ const InvoiceComponent: React.FC<InvoiceProps> = ({
           <TableBody>
             {debts &&
               debts
-                .filter(
-                  (debt: Debt) =>
-                    debt.invoiceID !== invoice.invoiceID && !debt?.isPaid,
-                )
+                .filter((debt: Debt) => !debt?.isPaid)
                 .map((debt: Debt) => (
                   <TableRow key={debt.invoiceID}>
                     <TableCell>{debt?.invoiceID ?? ''}</TableCell>
@@ -283,12 +282,33 @@ const InvoiceComponent: React.FC<InvoiceProps> = ({
       </TableContainer>
 
       {/* Total Amount */}
+      <Box textAlign="left" my={2}>
+        <Typography variant="body1">
+          Abonnement: {Number(settings.getSettings.subscription).toFixed(2)}
+          DA
+        </Typography>
+      </Box>
+      <Box textAlign="left" my={2}>
+        <Typography variant="body1">
+          Taxe de collecte des déchets ménagers:{' '}
+          {Number(settings.getSettings.tax).toFixed(2)}
+          DA
+        </Typography>
+      </Box>
       <Box textAlign="right" my={2}>
         <Typography variant="h6">
           Montant total:{' '}
           {invoice?.isPaid && invoice?.debt && !invoice?.debt?.isPaid
-            ? Number(invoice?.debt?.amount).toFixed(2)
-            : invoice?.amount}{' '}
+            ? (
+                Number(invoice?.debt?.amount) +
+                Number(settings.getSettings.subscription) +
+                Number(settings.getSettings.tax)
+              ).toFixed(2)
+            : (
+                Number(invoice?.amount) +
+                Number(settings.getSettings.subscription) +
+                Number(settings.getSettings.tax)
+              ).toFixed(2)}
           DA
         </Typography>
       </Box>

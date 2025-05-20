@@ -5,7 +5,7 @@ import {
   DialogContent,
   Typography,
 } from '@mui/material';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { GET_INVOICE, getDebtsByConsumer } from '../../../api/apollo';
 import InvoiceComponent from './InvoiceComponent';
 type Settings = {
@@ -15,6 +15,8 @@ type Settings = {
     phone: string;
     email: string;
     deadline: string;
+    subscription: string;
+    tax: string;
   };
 };
 interface InvoiceDetailsModalProps {
@@ -29,7 +31,7 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
   settings,
 }) => {
   console.log('==>invoiceID', invoiceID);
-  const { loading, error, data } = useQuery(GET_INVOICE, {
+  const { refetch, loading, error, data } = useQuery(GET_INVOICE, {
     variables: { invoiceID },
     skip: !invoiceID,
   });
@@ -48,7 +50,9 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
 
   console.log('==>consumerDebtData', debts);
   const invoice = data?.invoice;
-
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
   return (
     <Dialog
       open={!!invoiceID}

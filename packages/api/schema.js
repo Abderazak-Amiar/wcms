@@ -104,6 +104,8 @@ type Settings {
   phone: String
   email: String
   deadline: String
+  subscription: String
+  tax: String
   createdAt: String
   updatedAt: String
 }
@@ -128,12 +130,13 @@ type Query {
     getDebtsByConsumer(consumerID: ID!): [Debt]
     getDebts(consumerID: ID!): [Debt]
     getUserByID(userID: ID!): User
+    getRecordByConsumerID(consumerID: ID!): Record
 }
 
 type Mutation {
     addConsumer(fullName: String!, phone: String): Consumer!
     addPayment(consumerID: ID!, invoiceID:String!, paidAmount:Float!): Payment!
-    addRecord(newRecord: String!, counterID: ID!, consumerID: ID!, period:String!): Record!
+    addRecord(newRecord: String!,oldRecord: String!, counterID: ID!, consumerID: ID!, period:String!): Record!
     updateRecord(recordID:ID!, newRecord: String!, counterID: ID!, consumerID: ID!, period:String!): Record!
     addCounter(counterID: ID!, consumerID: ID!, price: String!): Counter!
     updateConsumer(consumerID: ID!, fullName: String!, phone: String): Consumer
@@ -141,7 +144,7 @@ type Mutation {
     deleteConsumers(consumerIDs: [ID!]!): ResponseMessage
     deleteCounters(counterIDs: [ID!]!): ResponseMessage
     deleteUsers(userIDs: [ID!]!): ResponseMessage
-    addSettings(m3price: Float!, village: String!, phone: String, email:String, deadline: String!): Settings!
+    addSettings(m3price: Float!, village: String!, phone: String, email:String, deadline: String!, subscription: String!, tax: String!): Settings!
     updateSettings(m3Price: String!, village: String!): Settings!
     updateInvoicePrinted(invoiceID: String!): Invoice
     createInvoice(
@@ -174,6 +177,26 @@ type Mutation {
 
 export const resolvers = {
   Query: {
+    getRecordByConsumerID: (_, { consumerID }) =>
+      new Promise((resolve, reject) => {
+        if (!db.open) return reject(new Error('Database is closed'));
+
+        db.get(
+          `SELECT * FROM record WHERE consumerID = ? ORDER BY recordDate DESC LIMIT 1`,
+          [consumerID],
+          (err, row) => {
+            if (err) {
+              console.error('Error fetching record:', err);
+              return reject(err);
+            }
+            if (!row) {
+              console.warn(`No record found for consumerID: ${consumerID}`);
+              return resolve(null); // Return null if no record exists
+            }
+            resolve(row);
+          },
+        );
+      }),
     users: () =>
       new Promise((resolve, reject) => {
         if (!db.open) return reject(new Error('Database is closed'));
@@ -204,13 +227,13 @@ export const resolvers = {
       return new Promise((resolve, reject) => {
         db.serialize(() => {
           db.get(
-            `SELECT * FROM user WHERE userName='${args.userName}' AND password='${args.password}'`,
+            `SELECT userID, userName, role FROM user WHERE userName='${args.userName}' AND password='${args.password}'`,
             (err, row) => {
               if (err) {
                 console.error(err.message);
                 reject();
               }
-              if(row){
+              if (row) {
                 resolve({
                   message: 'LoggedIn successfully',
                   success: true,
@@ -385,7 +408,10 @@ export const resolvers = {
   },
 
   Mutation: {
-    addSettings: (_, { m3price, village, phone, email, deadline }) =>
+    addSettings: (
+      _,
+      { m3price, village, phone, email, deadline, subscription, tax },
+    ) =>
       new Promise((resolve, reject) => {
         if (!db.open) return reject(new Error('Database is closed'));
 
@@ -397,7 +423,7 @@ export const resolvers = {
           if (row) {
             // Update existing settings
             db.run(
-              `UPDATE settings SET m3price = ?, village = ?, updatedAt = ?, phone = ?, email = ?, deadline = ? WHERE rowid = (SELECT rowid FROM settings LIMIT 1)`,
+              `UPDATE settings SET m3price = ?, village = ?, updatedAt = ?, phone = ?, email = ?, deadline = ?, subscription = ?, tax = ? WHERE rowid = (SELECT rowid FROM settings LIMIT 1)`,
               [
                 parseFloat(m3price).toFixed(2),
                 village,
@@ -405,6 +431,8 @@ export const resolvers = {
                 phone,
                 email,
                 deadline,
+                subscription,
+                tax,
               ],
               function (err) {
                 if (err) reject(err);
@@ -416,6 +444,8 @@ export const resolvers = {
                   phone,
                   email,
                   deadline,
+                  subscription,
+                  tax,
                 });
               },
             );
@@ -423,7 +453,7 @@ export const resolvers = {
             // Insert new settings if it doesn't exist
             const createdAt = new Date().toISOString();
             db.run(
-              `INSERT INTO settings (m3Price, village, createdAt, phone, email, deadline) VALUES (?, ?, ?, ?, ?, ?)`,
+              `INSERT INTO settings (m3Price, village, createdAt, phone, email, deadline, subscription, tax) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 parseFloat(m3price).toFixed(2),
                 village,
@@ -431,6 +461,8 @@ export const resolvers = {
                 phone,
                 email,
                 deadline,
+                subscription,
+                tax,
               ],
               function (err) {
                 if (err) reject(err);
@@ -442,13 +474,14 @@ export const resolvers = {
                   phone,
                   email,
                   deadline,
+                  subscription,
+                  tax,
                 });
               },
             );
           }
         });
       }),
-
     addConsumer: (_, { fullName, phone }) =>
       new Promise((resolve, reject) => {
         if (!db.open) return reject(new Error('Database is closed'));
@@ -816,7 +849,10 @@ export const resolvers = {
       });
     },
 
-    addRecord: (_, { newRecord, counterID, consumerID, period, userID = 1 }) =>
+    addRecord: (
+      _,
+      { newRecord, oldRecord, counterID, consumerID, period, userID = 1 },
+    ) =>
       new Promise((resolve, reject) => {
         if (!db.open) return reject(new Error('Database is closed'));
 
@@ -838,107 +874,115 @@ export const resolvers = {
               );
             }
 
-            // Step 2: Get the last record for this consumer
-            db.get(
-              `SELECT * FROM record WHERE consumerID = ? ORDER BY recordDate DESC LIMIT 1`,
-              [consumerID],
-              (err, lastRecord) => {
-                if (err) return reject(err);
-
-                let oldRecord = 0;
-
-                // Ensure oldRecord is the newRecord of the last inserted record
-                if (lastRecord) {
-                  oldRecord = lastRecord.newRecord;
-                }
-
-                const newRecordNumber = parseFloat(newRecord);
-                const oldRecordNumber = parseFloat(oldRecord);
-
-                if (newRecordNumber <= oldRecordNumber) {
-                  return reject(
-                    new Error(
-                      `INVALID_RECORD: New record (${newRecord}) must be greater than the last recorded value (${oldRecord}).`,
-                    ),
-                  );
-                }
-
-                // Step 3: Always create a new record
-                const recordID = nanoid();
-                const createdAt = new Date().toISOString();
-                const updatedAt = new Date().toISOString();
-                const recordDate = moment().toISOString();
-                const nextRecordDate = moment(recordDate)
-                  .add(3, 'months')
-                  .toISOString();
-
-                const newRecordObj = {
-                  recordID,
-                  period,
-                  recordDate,
-                  nextRecordDate,
-                  oldRecord,
-                  newRecord,
-                  createdAt,
-                  updatedAt,
-                  counterID,
-                  consumerID,
-                  userID,
-                };
-
-                const query = `INSERT INTO record 
-                               (recordID, period, recordDate, nextRecordDate, oldRecord, newRecord, createdAt, updatedAt, counterID, consumerID, userID) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-                const params = Object.values(newRecordObj);
-
-                db.run(query, params, function (err) {
+            // Step 2: Get the last record for this consumer if oldRecord is not provided
+            if (oldRecord === undefined || oldRecord === null) {
+              db.get(
+                `SELECT * FROM record WHERE consumerID = ? ORDER BY recordDate DESC LIMIT 1`,
+                [consumerID],
+                (err, lastRecord) => {
                   if (err) return reject(err);
 
-                  // Step 4: Fetch price settings
-                  db.get(
-                    `SELECT m3price FROM settings LIMIT 1`,
-                    [],
-                    (err, settingsRow) => {
-                      if (err) return reject(err);
-                      if (!settingsRow)
-                        return reject(new Error('Settings not found'));
+                  let calculatedOldRecord = 0;
 
-                      const consumption =
-                        newRecordObj.newRecord - newRecordObj.oldRecord;
-                      const totalAmount =
-                        consumption * parseFloat(settingsRow.m3price);
-                      const invoiceID = nanoid();
-                      const paymentCode = `INV-${invoiceID.slice(0, 8)}`;
+                  if (lastRecord) {
+                    calculatedOldRecord = lastRecord.newRecord;
+                  }
 
-                      db.run(
-                        `INSERT INTO invoice 
-                       (invoiceID, amount, paymentCode, paymentDate, isPaid, isPrinted, createdAt, updatedAt, consumerID, debtID, recordID, userID) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                        [
-                          invoiceID,
-                          totalAmount.toFixed(2),
-                          paymentCode,
-                          null,
-                          false,
-                          false,
-                          new Date().toISOString(),
-                          updatedAt,
-                          consumerID,
-                          null, // debtID
-                          newRecordObj.recordID,
-                          userID,
-                        ],
-                        function (err) {
-                          if (err) return reject(err);
-                          return resolve(newRecordObj);
-                        },
-                      );
-                    },
-                  );
-                });
-              },
-            );
+                  // Proceed with creating the new record
+                  createNewRecord(calculatedOldRecord);
+                },
+              );
+            } else {
+              // Use the provided oldRecord
+              createNewRecord(parseFloat(oldRecord));
+            }
+
+            function createNewRecord(calculatedOldRecord) {
+              const newRecordNumber = parseFloat(newRecord);
+
+              if (newRecordNumber <= calculatedOldRecord) {
+                return reject(
+                  new Error(
+                    `INVALID_RECORD: New record (${newRecord}) must be greater than the old record (${calculatedOldRecord}).`,
+                  ),
+                );
+              }
+
+              // Step 3: Always create a new record
+              const recordID = nanoid();
+              const createdAt = new Date().toISOString();
+              const updatedAt = new Date().toISOString();
+              const recordDate = moment().toISOString();
+              const nextRecordDate = moment(recordDate)
+                .add(3, 'months')
+                .toISOString();
+
+              const newRecordObj = {
+                recordID,
+                period,
+                recordDate,
+                nextRecordDate,
+                oldRecord: calculatedOldRecord,
+                newRecord,
+                createdAt,
+                updatedAt,
+                counterID,
+                consumerID,
+                userID,
+              };
+
+              const query = `INSERT INTO record 
+                             (recordID, period, recordDate, nextRecordDate, oldRecord, newRecord, createdAt, updatedAt, counterID, consumerID, userID) 
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+              const params = Object.values(newRecordObj);
+
+              db.run(query, params, function (err) {
+                if (err) return reject(err);
+
+                // Step 4: Fetch price settings and create an invoice
+                db.get(
+                  `SELECT m3price FROM settings LIMIT 1`,
+                  [],
+                  (err, settingsRow) => {
+                    if (err) return reject(err);
+                    if (!settingsRow)
+                      return reject(new Error('Settings not found'));
+
+                    const consumption =
+                      newRecordObj.newRecord - newRecordObj.oldRecord;
+                    const totalAmount =
+                      consumption * parseFloat(settingsRow.m3price);
+                    const invoiceID = nanoid();
+                    const paymentCode = `INV-${invoiceID.slice(0, 8)}`;
+
+                    db.run(
+                      `INSERT INTO invoice 
+                     (invoiceID, amount, paymentCode, paymentDate, isPaid, isPrinted, createdAt, updatedAt, consumerID, debtID, recordID, userID) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                      [
+                        invoiceID,
+                        totalAmount.toFixed(2),
+                        paymentCode,
+                        null,
+                        false,
+                        false,
+                        new Date().toISOString(),
+                        updatedAt,
+                        consumerID,
+                        null, // debtID
+                        newRecordObj.recordID,
+                        userID,
+                      ],
+                      function (err) {
+                        if (err) return reject(err);
+                        return resolve(newRecordObj);
+                      },
+                    );
+                  },
+                );
+              });
+            }
           },
         );
       }),
