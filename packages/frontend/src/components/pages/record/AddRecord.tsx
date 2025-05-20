@@ -4,7 +4,11 @@ import { useFormik } from 'formik';
 import { enqueueSnackbar } from 'notistack';
 import { useCallback, useEffect, useState } from 'react';
 import * as yup from 'yup';
-import { addRecord, getConsumers } from '../../../api/apollo';
+import {
+  addRecord,
+  getConsumers,
+  getRecordByConsumerID,
+} from '../../../api/apollo';
 import { getCurrentTrimester } from '../../../helpers/getCurrentTrimester';
 import { TrimesterSelector } from '../../molecules/TrimesterSelector';
 
@@ -24,24 +28,34 @@ type AddRecordFormValues = {
   consumerID: string;
   counterID: string;
   newRecord: string;
+  oldRecord: string;
   period: string;
 };
 
 function AddRecord() {
   const [hasCounter, setHasCounter] = useState(false);
   const [isConsumerSelected, setIsConsumerSelected] = useState(false);
+  const [selectedConsumerID, setSelectedConsumerID] = useState<string | null>(
+    null,
+  );
+
   const initialValues: AddRecordFormValues = {
     consumerID: '',
     counterID: '',
     newRecord: '',
+    oldRecord: '',
     period: getCurrentTrimester(),
   };
 
   const validationSchema = yup.object({
     newRecord: yup
       .string()
-      .matches(/^\d+$/, 'Veuillez entrer un nombre valide') // ✅ Accepte uniquement les chiffres
+      .matches(/^\d+$/, 'Veuillez entrer un nombre valide') // ✅ Accepts only numbers
       .required('Recensement requis'),
+    oldRecord: yup
+      .string()
+      .matches(/^\d+$/, 'Veuillez entrer un nombre valide') // ✅ Accepts only numbers
+      .required('Ancien recensement requis'), // Added validation for oldRecord
     consumerID: yup.string().required('Consommateur requis'),
     counterID: yup.string().required('CounterID requis'),
     period: yup.string().required('Periode requise'),
@@ -51,6 +65,9 @@ function AddRecord() {
   const [submit, { loading }] = useMutation(addRecord, {
     onCompleted: () => {
       enqueueSnackbar('Recensement fait avec succès', { variant: 'success' });
+      formik.resetForm(); // Reset the form after successful submission
+      setSelectedConsumerID(null); // Reset selected consumer
+      refetchConsumerRecords(); // Refresh the consumer records
     },
     onError: (err) => {
       console.error('==> error', err);
@@ -72,6 +89,12 @@ function AddRecord() {
         enqueueSnackbar('Une erreur est survenue', { variant: 'error' });
       }
     },
+    refetchQueries: [{ query: getConsumers }], // Refresh consumer data
+  });
+
+  const { refetch: refetchConsumerRecords } = useQuery(getRecordByConsumerID, {
+    skip: !selectedConsumerID, // Skip the query if no consumerID is selected
+    variables: { consumerID: selectedConsumerID },
   });
 
   // Requête pour récupérer la liste des consommateurs
@@ -80,8 +103,17 @@ function AddRecord() {
     error: queryError,
     data: consumersData,
   } = useQuery<{ consumers: Consumer[] }>(getConsumers);
-  console.log('==>consumersData', consumersData);
-  // Affichage d'une notification en cas d'erreur de requête
+
+  // Requête pour récupérer le dernier enregistrement du consommateur sélectionné
+  const {
+    data: consumerRecords,
+    loading: loadingRecords,
+    error: recordErrors,
+  } = useQuery(getRecordByConsumerID, {
+    skip: !selectedConsumerID, // Skip the query if no consumerID is selected
+    variables: { consumerID: selectedConsumerID },
+  });
+
   useEffect(() => {
     if (queryError) {
       console.error('Erreur de requête:', queryError);
@@ -102,12 +134,25 @@ function AddRecord() {
     },
   });
 
+  // Pré-remplir oldRecord si un enregistrement existe
+  useEffect(() => {
+    if (consumerRecords?.getRecordByConsumerID) {
+      const { newRecord } = consumerRecords.getRecordByConsumerID;
+      if (formik.values.oldRecord !== newRecord) {
+        formik.setFieldValue('oldRecord', newRecord); // Prefill oldRecord with the last newRecord
+      }
+    } else if (formik.values.oldRecord !== '') {
+      formik.setFieldValue('oldRecord', ''); // Reset oldRecord if no record exists
+    }
+  }, [consumerRecords]);
+
   const submitRecord = useCallback(
     (values: AddRecordFormValues) => {
       submit({
         variables: {
           ...values,
-          newRecord: String(values.newRecord), // ✅ Conversion en string
+          newRecord: String(values.newRecord), // ✅ Convert to string
+          oldRecord: String(values.oldRecord), // ✅ Convert to string
         },
       });
     },
@@ -139,10 +184,10 @@ function AddRecord() {
               ? setHasCounter(false)
               : setHasCounter(true);
 
-            formik.setFieldValue(
-              'consumerID',
-              newValue ? newValue.consumerID : '',
-            );
+            const consumerID = newValue ? newValue.consumerID : '';
+            setSelectedConsumerID(consumerID); // Set the selected consumerID
+
+            formik.setFieldValue('consumerID', consumerID);
             formik.setFieldValue(
               'counterID',
               newValue?.counters?.find(
@@ -165,12 +210,27 @@ function AddRecord() {
           value={formik.values.period}
           onChange={(value) => formik.setFieldValue('period', value)}
         />
+        {!consumerRecords?.getRecordByConsumerID && (
+          <TextField
+            fullWidth
+            type="number"
+            id="oldRecord"
+            name="oldRecord"
+            label="Ancien recensement en M³"
+            value={formik.values.oldRecord}
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+            error={formik.touched.oldRecord && Boolean(formik.errors.oldRecord)}
+            helperText={formik.touched.oldRecord && formik.errors.oldRecord}
+            sx={{ marginBlock: '8px' }}
+          />
+        )}
         <TextField
           fullWidth
           type="number"
           id="newRecord"
           name="newRecord"
-          label="Consommation d'eau en M³"
+          label="Nouveau recensement en M³"
           value={formik.values.newRecord}
           onChange={formik.handleChange}
           onBlur={formik.handleBlur}

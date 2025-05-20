@@ -11,10 +11,13 @@ type SettingsFormValues = {
   phone: string;
   email: string;
   deadline: string;
+  subscription: string;
+  tax:string;
 };
 function UserSetting() {
   // Fetch existing settings
   const { refetch, data, loading: loadingSettings } = useQuery(getSettings);
+  console.log('==>SETTINGS',data);
   // Set initial values based on fetched data or fallback to defaults
   const initialValues: SettingsFormValues = {
     m3price: data?.getSettings?.m3price || '',
@@ -22,6 +25,8 @@ function UserSetting() {
     phone: data?.getSettings?.phone || '',
     email: data?.getSettings?.email || '',
     deadline: data?.getSettings?.deadline || '',
+    subscription: data?.getSettings?.subscription || '',
+    tax: data?.getSettings?.tax || '',
   };
 
   const validationSchema = yup.object({
@@ -31,6 +36,8 @@ function UserSetting() {
       .required('Prix requis'),
     village: yup.string().required('Village requis'),
     deadline: yup.string().required('Délais requis'),
+    subscription: yup.string().required('Abonnement requis'),
+    tax: yup.string().required('Tax requise'),
   });
 
   // Mutation for adding/updating settings
@@ -161,6 +168,43 @@ function UserSetting() {
               sx={{
                 marginBlock: '8px',
 
+                '& .MuiInputBase-input': {
+                  color: 'rgba(0, 0, 0, 0.4)', // Change text color inside the input
+                  fontWeight: 'bold',
+                },
+              }}
+            />
+            <TextField
+              fullWidth
+              id="subscription"
+              name="subscription"
+              label="Abonnement(DA)"
+              value={formik.values.subscription}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              error={formik.touched.subscription && Boolean(formik.errors.subscription)}
+              helperText={formik.touched.subscription && formik.errors.subscription}
+              sx={{
+                marginBlock: '8px',
+
+                '& .MuiInputBase-input': {
+                  color: 'rgba(0, 0, 0, 0.4)', // Change text color inside the input
+                  fontWeight: 'bold',
+                },
+              }}
+            />
+            <TextField
+              fullWidth
+              id="tax"
+              name="tax"
+              label="Tax collecte déchets(DA)"
+              value={formik.values.tax}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              error={formik.touched.tax && Boolean(formik.errors.tax)}
+              helperText={formik.touched.tax && formik.errors.tax}
+              sx={{
+                marginBlock: '8px',
                 '& .MuiInputBase-input': {
                   color: 'rgba(0, 0, 0, 0.4)', // Change text color inside the input
                   fontWeight: 'bold',
