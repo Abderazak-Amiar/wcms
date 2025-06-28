@@ -39,6 +39,7 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
   const consumerID = data?.invoice?.consumer?.consumerID;
 
   const {
+    refetch: debtsRefetch,
     loading: debtsLoading,
     error: debtsError,
     data: debts,
@@ -52,7 +53,8 @@ const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
   const invoice = data?.invoice;
   useEffect(() => {
     refetch();
-  }, [refetch]);
+    debtsRefetch();
+  }, [refetch, debtsRefetch, invoiceID, consumerID]);
   return (
     <Dialog
       open={!!invoiceID}

@@ -201,9 +201,7 @@ export const resolvers = {
       new Promise((resolve, reject) => {
         if (!db.open) return reject(new Error('Database is closed'));
         db.all(`SELECT * FROM user`, (err, rows) => {
-          console.log('==>rows', rows);
           if (err) reject(err);
-          console.log('==>rows', rows);
           resolve(rows);
         });
       }),
@@ -357,7 +355,6 @@ export const resolvers = {
       });
     },
     getDebtsByConsumer: (_, { consumerID }) => {
-      console.log('Received consumerID:', consumerID); // Debug log
       return new Promise((resolve, reject) => {
         db.all(
           'SELECT * FROM debt WHERE consumerID = ?',
@@ -566,11 +563,6 @@ export const resolvers = {
     updateCounter: (parent, args) => {
       return new Promise((resolve, reject) => {
         db.serialize(() => {
-          console.log(
-            `🟢 Request to update counter ${args.counterID} for consumer ${args.consumerID} with status '${args.status}'`,
-          );
-
-          // Only check if we are updating TO "En Marche"
           if (args.status === 'En Marche') {
             db.get(
               `SELECT counterID FROM counter WHERE consumerID = ? AND status = 'En Marche' AND counterID != ?`,
@@ -790,8 +782,6 @@ export const resolvers = {
       }),
 
     addCounter: (_, args) => {
-      console.log('==>args', args);
-
       return new Promise((resolve, reject) => {
         db.all(
           `SELECT status FROM counter WHERE consumerID = ?`,
@@ -1183,7 +1173,6 @@ export const resolvers = {
 
     deleteConsumers: (_, { consumerIDs }) =>
       new Promise((resolve, reject) => {
-        console.log('==> consumerIDs', consumerIDs);
         if (!db.open) return reject(new Error('Database is closed'));
 
         db.serialize(() => {

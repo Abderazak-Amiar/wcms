@@ -120,6 +120,7 @@ const generateInvoicePDF = (
             halign: 'left',
             fontSize: 20,
             fontStyle: 'bold',
+            textColor: [80, 80, 80], // Light gray color
           },
         },
         {
@@ -130,6 +131,25 @@ const generateInvoicePDF = (
             halign: 'right',
             fontSize: 20,
             fontStyle: 'bold',
+            textColor: [100, 100, 100], // Slightly lighter gray color
+          },
+        },
+      ],
+      [
+        {
+          content: `Téléphone: ${settings?.getSettings.phone ?? ''}`,
+          styles: {
+            halign: 'left',
+            fontSize: 10,
+            textColor: [100, 100, 100], // Light gray color
+          },
+        },
+        {
+          content: `Email: ${settings?.getSettings.email ?? ''}`,
+          styles: {
+            halign: 'right',
+            fontSize: 10,
+            textColor: [100, 100, 100], // Light gray color
           },
         },
       ],
@@ -316,7 +336,6 @@ const generateInvoicePDF = (
     styles: { lineColor: [200, 200, 200], lineWidth: 0.5 },
   });
   const visibleDebts = debts.filter((debt) => Number(debt.amount) > 0);
-  console.log('==>visibleDebts', visibleDebts);
   if (visibleDebts.length > 0) {
     autoTable(doc, {
       head: [['Factures en Dette', 'Montant', 'Date']],
@@ -413,12 +432,17 @@ const generateInvoicePDF = (
     body: [
       [
         {
-          content: '',
-          styles: { halign: 'center', fontSize: 12, fontStyle: 'bold' },
+          content: 'Développé par Ing. Logiciel Abderazak Amiar',
+          styles: {
+            halign: 'center',
+            fontSize: 10,
+            textColor: [150, 150, 150],
+          },
         },
       ],
     ],
     theme: 'plain',
+    startY: (doc.lastAutoTable?.finalY ?? 10) + 5,
   });
 
   return doc;
@@ -818,7 +842,6 @@ const InvoiceList: React.FC = () => {
                   <TextField {...params} label="Imprimé" />
                 )}
               />
-              ;
             </FormControl>
           </Grid>
         </Grid>
@@ -900,7 +923,10 @@ const InvoiceList: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <IconButton
-                        onClick={() => setSelectedInvoice(item.invoiceID)}
+                        onClick={() => {
+                          setSelectedInvoice(item.invoiceID);
+                          refetch(); // Refresh the data when an invoice is selected
+                        }}
                       >
                         <VisibilityIcon />
                       </IconButton>
@@ -953,11 +979,13 @@ const InvoiceList: React.FC = () => {
         </Button>
       </Box>
 
-      {/* Invoice Details Modal */}
       {selectedInvoice && dataSettings && (
         <InvoiceDetailsModal
           invoiceID={selectedInvoice}
-          onClose={() => setSelectedInvoice(null)}
+          onClose={() => {
+            setSelectedInvoice(null);
+            refetch(); // Refresh the data when the modal is closed
+          }}
           settings={dataSettings}
         />
       )}
