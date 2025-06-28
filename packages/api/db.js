@@ -4,7 +4,7 @@ import process from 'process';
 import sqlite3 from 'sqlite3';
 
 // Define the database file path
-const dbPath = path.join('C:', 'ProgramData', 'wcms', 'wcms.db');
+const dbPath = path.join('wcms.db');
 
 // Ensure the directory exists
 const dbDir = path.dirname(dbPath);

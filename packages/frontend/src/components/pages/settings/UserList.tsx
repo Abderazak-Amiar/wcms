@@ -360,7 +360,7 @@ export default function UserList() {
   const refetchUsers = () => {
     refetch();
   };
-
+console.log('==>USERS',users);
   const handleRequestSort = (
     _event: React.MouseEvent<unknown>,
     property: keyof User,

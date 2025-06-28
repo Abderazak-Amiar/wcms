@@ -12,7 +12,7 @@ import {
 import { useFormik } from 'formik';
 import { enqueueSnackbar } from 'notistack';
 import * as yup from 'yup';
-import { getConsumers, updateRecord } from '../../../api/apollo';
+import { GET_INVOICES, getConsumers, updateRecord } from '../../../api/apollo';
 import { getCurrentTrimester } from '../../../helpers/getCurrentTrimester';
 import { TrimesterSelector } from '../../molecules/TrimesterSelector';
 import { Invoice } from './InvoiceList';
@@ -65,7 +65,7 @@ export function EditInvoiceModal({
 
   const [submit, { loading }] = useMutation(updateRecord, {
     onCompleted: () => {
-      enqueueSnackbar('Recensement fait avec succès', { variant: 'success' });
+      enqueueSnackbar('Mise à jour fait avec succès', { variant: 'success' });
       onClose();
     },
     onError: (err) => {
@@ -80,6 +80,7 @@ export function EditInvoiceModal({
         enqueueSnackbar('Une erreur est survenue', { variant: 'error' });
       }
     },
+    refetchQueries: [{ query: GET_INVOICES }], // Add this line to refresh GET_INVOICES
   });
 
   const { loading: queryLoading, data: consumersData } = useQuery<{
