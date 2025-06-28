@@ -20,7 +20,11 @@ function createWindow(): void {
   win = new BrowserWindow({
     show: false, // Hide initially to avoid flicker during resize
     minimizable: true,
-    icon: path.join(process.env.VITE_PUBLIC as string, 'electron-vite.svg'),
+    icon: path.join(
+      process.env.VITE_PUBLIC as string,
+      'icons',
+      'water-consumption.png',
+    ),
     webPreferences: {
       preload: path.join(app.getAppPath(), 'dist-electron', 'preload.mjs'),
       devTools: true,
