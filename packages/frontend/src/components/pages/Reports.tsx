@@ -168,8 +168,16 @@ function Reports() {
   };
 
   const generatePDF = async () => {
-    const { totalRevenue, totalDebt, paidInvoices, unpaidInvoices } =
-      calculateStats();
+    const {
+      totalRevenue,
+      totalDebt,
+      paidInvoices,
+      unpaidInvoices,
+      partiallyPaidInvoices,
+      totalSubscriptionAndTax,
+      grandTotal,
+    } = calculateStats();
+    const grandTotalWithDebt = grandTotal + totalDebt; // Calculate Grand Total with debts
     const doc = new jsPDF();
     const reportDate = new Date().toLocaleDateString();
 
@@ -207,6 +215,12 @@ function Reports() {
         ['Dette Totale', `${totalDebt.toFixed(2)} DA`],
         ['Factures Payées', `${paidInvoices}`],
         ['Factures Non Payées', `${unpaidInvoices}`],
+        [
+          'Abonnement et Taxe de collecte des déchets ménagers',
+          `${totalSubscriptionAndTax.toFixed(2)} DA`,
+        ],
+        ['Grand Total', `${grandTotal.toFixed(2)} DA`],
+        ['Grand Total avec dettes', `${grandTotalWithDebt.toFixed(2)} DA`], // Add Grand Total with debts
       ],
       theme: 'grid',
       styles: { fontSize: 12, cellPadding: 3 },
@@ -772,6 +786,12 @@ function Reports() {
                     <TableCell>Grand Total</TableCell>
                     <TableCell align="right">
                       {grandTotal.toFixed(2)} DA
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Grand Total avec dettes</TableCell>
+                    <TableCell align="right">
+                      {(grandTotal + totalDebt).toFixed(2)} DA
                     </TableCell>
                   </TableRow>
                 </TableBody>
