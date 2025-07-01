@@ -212,7 +212,7 @@ const EnhancedTableToolbar = ({
           variant="subtitle1"
           component="div"
         >
-          {numSelected} selected
+          {numSelected} sélectionné
         </Typography>
       ) : (
         <Typography
@@ -313,16 +313,16 @@ const DeleteConfirmationDialog = ({
 }: DeleteConfirmationDialogProps) => {
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Delete Counters</DialogTitle>
+      <DialogTitle>Supprimer Compteur</DialogTitle>
       <DialogContent>
         <DialogContentText>
-          Are you sure you want to delete the selected counters?
+          Êtes-vous sûr de vouloir supprimer les compteurs sélectionnés ?
         </DialogContentText>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>Annuler</Button>
         <Button onClick={onConfirm} color="error">
-          Delete
+          Supprimer
         </Button>
       </DialogActions>
     </Dialog>

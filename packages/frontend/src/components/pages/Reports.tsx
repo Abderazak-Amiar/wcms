@@ -23,7 +23,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable'; // Ensure autoTable is imported
 import { useEffect, useRef, useState } from 'react';
 import { GET_INVOICES, getSettings } from '../../api/apollo';
-type Settings = {
+export type Settings = {
   getSettings: {
     m3price: GLfloat;
     village: string;

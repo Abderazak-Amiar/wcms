@@ -211,7 +211,7 @@ const EnhancedTableToolbar = ({
           variant="subtitle1"
           component="div"
         >
-          {numSelected} selected
+          {numSelected} sélectionné
         </Typography>
       ) : (
         <Typography

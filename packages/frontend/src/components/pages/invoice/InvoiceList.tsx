@@ -436,13 +436,13 @@ const generateInvoicePDF = (
           styles: {
             halign: 'center',
             fontSize: 10,
-            textColor: [150, 150, 150],
+            textColor: [180, 180, 180], // Slightly lighter gray color
           },
         },
       ],
     ],
     theme: 'plain',
-    startY: (doc.lastAutoTable?.finalY ?? 10) + 5,
+    startY: doc.internal.pageSize.height - 22, // Position near the bottom of the page
   });
 
   return doc;

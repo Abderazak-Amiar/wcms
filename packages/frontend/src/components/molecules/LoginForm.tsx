@@ -1,4 +1,4 @@
-import { useLazyQuery } from '@apollo/client';
+import { useLazyQuery, useQuery } from '@apollo/client';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import { Button, Link, TextField, Typography } from '@mui/material';
@@ -8,8 +8,9 @@ import { useFormik } from 'formik';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as yup from 'yup';
-import { getUser } from '../../api/apollo';
+import { getSettings, getUser } from '../../api/apollo';
 import { useAuthStore } from '../../store/useAuthStore';
+import { Settings } from '../pages/Reports';
 import { userLoginType } from './LoginForm.type';
 
 function LoginForm() {
@@ -20,9 +21,13 @@ function LoginForm() {
     userName: '',
     password: '',
   };
-
+  const {
+    loading: loadingSettings,
+    error: errorSettings,
+    data: dataSettings,
+  } = useQuery<Settings>(getSettings);
   const [user, setUser] = useState<userLoginType>(initialValues);
-
+  console.log('==>Login', dataSettings);
   const validationSchema = yup.object({
     userName: yup.string().required('Utilisateur requis'),
     password: yup
@@ -61,7 +66,7 @@ function LoginForm() {
       console.log('==>err', err);
     },
   });
-console.log('==>isLoggedIn',isLoggedIn);
+  console.log('==>isLoggedIn', isLoggedIn);
   return (
     <div className="login-form-container">
       <form onSubmit={formik.handleSubmit} className="login-form">
@@ -74,7 +79,8 @@ console.log('==>isLoggedIn',isLoggedIn);
           color={theme.palette.grey[400]}
           sx={{ marginBottom: '64px' }}
         >
-          Gestion de consomation d’eau - village TAOURIRT
+          Gestion de consomation d’eau - village{' '}
+          {dataSettings?.getSettings?.village || 'Inconnu'}
         </Typography>
         <TextField
           fullWidth

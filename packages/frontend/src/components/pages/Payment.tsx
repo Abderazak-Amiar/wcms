@@ -44,6 +44,8 @@ function AddRecord() {
       console.error('==> error', err);
       if (err.message.includes('Total paid amount exceeds invoice amount')) {
         enqueueSnackbar('Montant supérieur !', { variant: 'info' });
+      } else if (err.message.includes('Invoice is already fully paid')) {
+        enqueueSnackbar('Facture déja payée !', { variant: 'info' });
       } else if (err.message.includes('Invoice not found')) {
         enqueueSnackbar('Facture Non Trouvée', {
           variant: 'error',

@@ -669,7 +669,11 @@ export const resolvers = {
 
                 const totalPaid = result?.totalPaid || 0;
                 const newTotalPaid = totalPaid + parseFloat(paidAmount);
-
+                console.log('==>totalPaid', totalPaid);
+                console.log('==>amount', amount);
+                if (totalPaid === parseInt(amount) && isPaid) {
+                  return reject(new Error('Invoice is already fully paid'));
+                }
                 if (newTotalPaid > amount) {
                   return reject(
                     new Error('Total paid amount exceeds invoice amount'),

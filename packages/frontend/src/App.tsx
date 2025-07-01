@@ -15,7 +15,6 @@ import Protected from './components/pages/Protected';
 import AddRecord from './components/pages/record/AddRecord';
 import Reports from './components/pages/Reports';
 import Settings from './components/pages/settings/Settings';
-import Unauthorized from './components/pages/Unauthorized';
 import Welcome from './components/pages/Welcome';
 
 function App() {
@@ -31,11 +30,13 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/unauthorized" element={<Unauthorized />} />
-
       {/* Shared protected route */}
       <Route
-        element={<Protected allowedRoles={['administrateur', 'utilisateur']} />}
+        element={
+          <Protected
+            allowedRoles={['administrateur', 'utilisateur', 'admin']}
+          />
+        }
       >
         <Route
           path="/"
